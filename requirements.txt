@@ -2,3 +2,4 @@ numpy
 scipy
 matplotlib
 kagglehub
+opencv-python
