@@ -3,3 +3,12 @@ scipy
 matplotlib
 kagglehub
 opencv-python
+keras
+keras-preprocessing
+keras-models
+keras-layer-normalization
+tensorflow
+flask
+requests
+google-auth-oauthlib
+google-api-python-client
