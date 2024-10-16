@@ -1,11 +1,11 @@
 import cv2
-import kagglehub
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ndarray
 
 # Download latest version
-path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
+# path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
+path = r"C:\Users\pilot1784\.cache\kagglehub\datasets\csafrit2\plant-leaves-for-image-classification\versions\2"
 
 print("Path to dataset files:", path)
 
@@ -82,51 +82,45 @@ def preprocess_image(image: ndarray) -> tuple[ndarray]:
     r, g, b = image[:, :, 0], image[:, :, 1], image[:, :, 2]
     plt.subplot(2, 3, 1, title="Original image")
     plt.imshow(image)
-    plt.subplot(2, 3, 4, title="Red channel")
-    plt.imshow(r, cmap="gray")
-    plt.subplot(2, 3, 5, title="Green channel")
-    plt.imshow(g, cmap="gray")
-    plt.subplot(2, 3, 6, title="Blue channel")
-    plt.imshow(b, cmap="gray")
 
     green = np.clip(g - r - b, 0, 255)
+    green = cv2.fastNlMeansDenoising(green, None, 4, 7, 21)
 
-    clahe = cv2.createCLAHE(clipLimit=10.0, tileGridSize=(8, 8))
-    green = clahe.apply(green.astype(np.uint8))
-    green = cv2.blur(green, (5, 5))
-    green = contrast_stretching(green)
-
-    edges = np.zeros_like(green)
-    # edges = laplace_of_gaussian(green, cv2.CV_8U)
-    # edges = contrast_stretching(edges)
-    # kernel = np.ones((3, 3), np.uint8)
-    # edges = cv2.dilate(edges, kernel, iterations=1)
+    edges = laplace_of_gaussian(green, cv2.CV_8U)
+    edges = contrast_stretching(edges)
+    edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
+    edges = cv2.blur(edges, (3, 3))
+    edges = laplace_of_gaussian(edges, cv2.CV_8U)
 
     plt.subplot(2, 3, 4, title="Edges")
     plt.imshow(edges, cmap="gray")
-    # contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    # max_area = max(contours, key=cv2.contourArea)
-    # 
-    # mask = np.zeros_like(green)
-    # cv2.fillPoly(mask, [max_area], 255)
-    # plt.subplot(2, 3, 5, title="Mask")
-    # plt.imshow(mask, cmap="gray")
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    max_area = max(contours, key=cv2.contourArea)
 
-    # green = cv2.bitwise_and(green, green, mask=mask)
+    mask = np.zeros_like(green)
+
+    cv2.fillPoly(mask, [max_area], 255)
+
+    plt.subplot(2, 3, 5, title="Green Mask")
+    plt.imshow(mask, cmap="gray")
+
+    green = green * mask
 
     # hsv range: H: +/- 10, S: +/- 10, V: +/- 10
     image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
 
     out[:, :, 0] = green
 
-    yellow = cv2.inRange(image, np.array([33, 84, 62]), np.array([53, 100, 82]))
+    yellow = cv2.inRange(image, np.array([18, 0, 0]), np.array([38, 255, 255]))  # 56->28
     yellow = cv2.bitwise_and(image, image, mask=yellow)
+    yellow = cv2.cvtColor(yellow, cv2.COLOR_HSV2RGB)
     yellow = np.average(yellow, axis=2)
 
     out[:, :, 1] = yellow
 
-    brown = cv2.inRange(image, np.array([15, 0, 90]), np.array([35, 17, 100]))
+    brown = cv2.inRange(image, np.array([5, 0, 0]), np.array([25, 255, 255]))  # 30->15
     brown = cv2.bitwise_and(image, image, mask=brown)
+    brown = cv2.cvtColor(brown, cv2.COLOR_HSV2RGB)
     brown = np.average(brown, axis=2)
 
     out[:, :, 2] = brown
@@ -135,6 +129,8 @@ def preprocess_image(image: ndarray) -> tuple[ndarray]:
     plt.imshow(green, cmap="gray")
     plt.subplot(2, 3, 3, title="Filtered Yellow")
     plt.imshow(yellow, cmap="gray")
+    plt.subplot(2, 3, 6, title="Filtered Brown")
+    plt.imshow(brown, cmap="gray")
 
     return out, green, yellow, brown
 
@@ -142,7 +138,7 @@ def preprocess_image(image: ndarray) -> tuple[ndarray]:
 img = cv2.imread(
     path +
     r"\Plants_2\test"
-    r"\Bael diseased (P4b)\0016_0007.JPG"
+    r"\Bael diseased (P4b)\0016_0010.JPG"
 )
 
 out = preprocess_image(img)
