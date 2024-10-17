@@ -16,7 +16,7 @@ print("Path to dataset files:", path)
 
 train_data_dir = path + r"\Plants_2\train"
 validation_data_dir = path + r"\Plants_2\valid"
-nb_train_samples = 4000
+nb_train_samples = 4274
 nb_validation_samples = 110
 epochs = 10
 batch_size = 16
@@ -84,10 +84,11 @@ validation_generator = test_datagen.flow_from_directory(
 if __name__ == "__main__":
     model.fit(
         train_generator,
-        steps_per_epoch=nb_train_samples // (batch_size * epochs),
+        # steps_per_epoch=nb_train_samples // batch_size,
         epochs=epochs,
         validation_data=validation_generator,
-        validation_steps=nb_validation_samples // batch_size
+        # validation_steps=nb_validation_samples // (batch_size * epochs)
     )
 
     model.save_weights('model_saved.weights.h5')
+    model.save('model_saved.keras')

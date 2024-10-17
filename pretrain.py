@@ -139,7 +139,11 @@ if __name__ == "__main__":
                     img = preprocess_image(img)
                     img = np.uint8(img * 255.0)
                     cv2.imwrite(os.path.join(path, dirs, "unhealthy", image), img)
-            elif "healthy" in plants.lower() and "unhealthy" not in plants.lower() and plants.lower() != "healthy":
+            elif (
+                    "healthy" in plants.lower()
+                    and "unhealthy" not in plants.lower()
+                    and plants.lower() != "healthy"
+            ):
                 print("Copying", os.path.join(dirs, plants), "to healthy")
 
                 for image in os.listdir(os.path.join(path, dirs, plants)):
