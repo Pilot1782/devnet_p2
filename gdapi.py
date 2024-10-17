@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 import os
 import flask
 import requests
@@ -24,6 +22,7 @@ app = flask.Flask(__name__)
 # key. See https://flask.palletsprojects.com/quickstart/#sessions.
 app.secret_key = 'bazingaaosmrvfpeanmgaaogmaeo[gmadgsdfasdfsafsgfsg]'
 
+current_credentials = None
 
 @app.route('/')
 def index():
@@ -32,28 +31,13 @@ def index():
 
 @app.route('/test')
 def test_api_request():
-  if 'credentials' not in flask.session:
-    return flask.redirect('authorize')
-
-  # Load credentials from the session.
-  credentials = google.oauth2.credentials.Credentials(
-      **flask.session['credentials'])
-
-  drive = googleapiclient.discovery.build(
-      API_SERVICE_NAME, API_VERSION, credentials=credentials)
-
-  files = drive.files().list().execute()
-
-  # Save credentials back to session in case access token was refreshed.
-  # ACTION ITEM: In a production app, you likely want to save these
-  #              credentials in a persistent database instead.
-  flask.session['credentials'] = credentials_to_dict(credentials)
-
-  return flask.jsonify(**files)
+  return flask.status(501)
 
 
 @app.route('/authorize')
 def authorize():
+  if current_credentials is not None:
+    return flask.status(423)
   # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps.
   flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
       CLIENT_SECRETS_FILE, scopes=SCOPES)
@@ -95,22 +79,20 @@ def oauth2callback():
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
   credentials = flow.credentials
-  flask.session['credentials'] = credentials_to_dict(credentials)
+  current_credentials = credentials
 
   return flask.redirect(flask.url_for('test_api_request'))
 
 
 @app.route('/revoke')
 def revoke():
-  if 'credentials' not in flask.session:
-    return ('You need to <a href="/authorize">authorize</a> before ' +
-            'testing the code to revoke credentials.')
-
-  credentials = google.oauth2.credentials.Credentials(
-    **flask.session['credentials'])
+  if current_credentials is not None:
+    current_credentials = None
+  else:
+    return('No credentials to revoke.' + print_index_table())
 
   revoke = requests.post('https://oauth2.googleapis.com/revoke',
-      params={'token': credentials.token},
+      params={'token': current_credentials.token},
       headers = {'content-type': 'application/x-www-form-urlencoded'})
 
   status_code = getattr(revoke, 'status_code')
