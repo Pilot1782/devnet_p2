@@ -1,5 +1,6 @@
 import os
 
+import cv2
 import kagglehub
 import numpy as np
 from keras.api.models import load_model
@@ -51,13 +52,30 @@ for image in os.listdir(os.path.join(path, "Plants_2", "test", "healthy")):
         f"{'  (WRONG)' if result > 0.5 else ''}"
     )
 
-print('\n' + '=' * 8 + ' UNKNOWN ' + '=' * 8)
+print('\n' + '=' * 8 + ' UNKNOWN LEAVES ' + '=' * 8)
+
+for image in os.listdir(os.path.join(path, "Plants_2", "images to predict")):
+    if not image.lower().endswith(".jpg"):
+        continue
+
+    img = cv2.imread(os.path.join(path, "Plants_2", "images to predict", image))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = preprocess_image(img)
+    img = img.reshape(1, 250, 250, 3)
+    result = model.predict(img, verbose=0)[0][0]
+
+    print(
+        f"Image: {image}, "
+        f"Result: {'  healthy' if result < 0.5 else 'unhealthy'} "
+        f"({abs(0.5 - result) * 200:.2f}%)"
+    )
+
+print('\n' + '=' * 8 + ' UNKNOWN PLANT BOX ' + '=' * 8)
 
 if os.path.exists(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"):
     for image in os.listdir(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"):
-        img = load_img(os.path.join(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001", image),
-                       target_size=(250, 250))
-        img = np.array(img)
+        img = cv2.imread(os.path.join(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001", image))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img = preprocess_image(img)
         img = img.reshape(1, 250, 250, 3)
         result = model.predict(img, verbose=0)[0][0]
