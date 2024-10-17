@@ -53,19 +53,20 @@ for image in os.listdir(os.path.join(path, "Plants_2", "test", "healthy")):
 
 print('\n' + '=' * 8 + ' UNKNOWN ' + '=' * 8)
 
-for image in os.listdir(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"):
-    img = load_img(os.path.join(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001", image),
-                   target_size=(250, 250))
-    img = np.array(img)
-    img = preprocess_image(img)
-    img = img.reshape(1, 250, 250, 3)
-    result = model.predict(img, verbose=0)[0][0]
+if os.path.exists(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"):
+    for image in os.listdir(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"):
+        img = load_img(os.path.join(r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001", image),
+                       target_size=(250, 250))
+        img = np.array(img)
+        img = preprocess_image(img)
+        img = img.reshape(1, 250, 250, 3)
+        result = model.predict(img, verbose=0)[0][0]
 
-    print(
-        f"Image: {image}, "
-        f"Result: {'  healthy' if result < 0.5 else 'unhealthy'} "
-        f"({abs(0.5 - result) * 200:.2f}%)"
-    )
+        print(
+            f"Image: {image}, "
+            f"Result: {'  healthy' if result < 0.5 else 'unhealthy'} "
+            f"({abs(0.5 - result) * 200:.2f}%)"
+        )
 
 print(f"\nWrong predictions: {wrong}")
 print(f"Accuracy: {(right + wrong) - wrong / 2:.2f}%")
