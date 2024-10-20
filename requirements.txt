@@ -8,7 +8,7 @@ keras-preprocessing
 keras-models
 keras-layer-normalization
 torch
-pyod
+torchvision
 flask
 requests
 google-auth-oauthlib
