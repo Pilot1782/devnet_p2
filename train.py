@@ -1,10 +1,13 @@
+import datetime
 import os
+import time
 from pathlib import Path
 from typing import Union, Tuple, List, Dict, Optional, Callable, Any
 
 import kagglehub
 import torch
 import torch.nn as nn
+from matplotlib import pyplot as plt
 from torch.utils.data import DataLoader
 from torchvision.datasets import VisionDataset
 from torchvision.datasets.folder import default_loader, make_dataset, IMG_EXTENSIONS
@@ -19,9 +22,7 @@ print("Path to dataset files:", path)
 
 train_data_dir = path + r"\Plants_2\train"
 validation_data_dir = path + r"\Plants_2\valid"
-nb_train_samples = 4274
-nb_validation_samples = 110
-epochs = 10
+epochs = 250
 batch_size = 16
 classes = ("healthy", "unhealthy")
 
@@ -194,8 +195,8 @@ class FilteredDataFolder(VisionDataset):
         Returns:
             tuple: (sample, target) where target is class_index of the target class.
         """
-        path, target = self.samples[index]
-        sample = self.loader(path)
+        _path, target = self.samples[index]
+        sample = self.loader(_path)
         if self.transform is not None:
             sample = self.transform(sample)
         if self.target_transform is not None:
@@ -279,19 +280,35 @@ test_transforms = transforms.Compose([
     transforms.ToTensor()
 ])
 
+# Define the transformation for the validation data
+valid_transforms = transforms.Compose([
+    transforms.Resize((250, 250)),
+    transforms.RandomRotation(40),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor()
+])
+
 # Load the training dataset
 train_dataset = FilteredImageFolder(root=train_data_dir, transform=train_transforms, allowed_classes=classes)
 print(f"Training classes: " + ", ".join(train_dataset.class_to_idx.keys()))
 
 # Load the testing dataset
 test_dataset = FilteredImageFolder(root=validation_data_dir, transform=test_transforms, allowed_classes=classes)
-print(f"Validation classes: " + ", ".join(test_dataset.class_to_idx.keys()))
+print(f"Testing classes: " + ", ".join(test_dataset.class_to_idx.keys()))
+
+# Load the validating dataset
+valid_dataset = FilteredImageFolder(root=os.path.join(path, "Plants_2", "test"), transform=valid_transforms,
+                                    allowed_classes=classes)
+print(f"Validation classes: " + ", ".join(valid_dataset.class_to_idx.keys()))
 
 # Create the DataLoader for the training dataset
 train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 # Create the DataLoader for the testing dataset
 test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+# Create the DataLoader for the validating dataset
+valid_dataloader = DataLoader(valid_dataset, batch_size=16, shuffle=True)
 
 
 def train(dataloader, _model, _loss_fn, _optimizer):
@@ -327,12 +344,48 @@ def test(dataloader, _model, _loss_fn):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     test_loss /= num_batches
     correct /= size
-    print(f"Test Error: \n Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    print(f"Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+
+    return correct
 
 
 if __name__ == "__main__":
     model = model.to(device)
+    test_acc = []
+    val_acc = []
+    tStart = 0
     for t in range(epochs):
         print(f"Epoch {t + 1}\n-------------------------------")
+        tStart = time.time()
+
         train(train_dataloader, model, loss_fn, optimizer)
-        test(test_dataloader, model, loss_fn)
+
+        print("Test Error:", end="\n  ")
+        test_acc.append(test(test_dataloader, model, loss_fn))
+        print("Validation Error:", end="\n  ")
+        val_acc.append(test(valid_dataloader, model, loss_fn))
+
+        dTime = time.time() - tStart
+        remaining = epochs - (t + 1)
+        srem = remaining * dTime
+        print(
+            f"ETA: {datetime.datetime.fromtimestamp(datetime.datetime.now().timestamp() + srem)}"
+            f"\n-------------------------------\n"
+        )
+
+    torch.save(model.state_dict(), "model.pth")
+    print("Saved PyTorch Model State to model.pth")
+
+    plt.plot(test_acc, label="Test Data")
+    plt.plot(val_acc, label="Validation Data")
+    plt.legend()
+    plt.xlabel("Epoch #")
+    plt.ylabel("Accuracy")
+    plt.show()
+
+    print("Final accuracy over validation data\n-------------------------------")
+    test(
+        valid_dataloader,
+        model,
+        loss_fn
+    )
