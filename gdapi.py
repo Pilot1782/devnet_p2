@@ -32,9 +32,9 @@ def index():
   return print_index_table()
 
 
-@app.route('/test')
-def test_api_request():
-  return flask.status(501)
+#@app.route('/test')
+#def test_api_request():
+#  return flask.status(501)
 
 
 @app.route('/authorize')
@@ -142,6 +142,7 @@ def print_index_table():
           '    API request</a> again, you should go back to the auth flow.' +
           '</td></tr></table>')
 
+@app.route("/test")
 def hasNewImage():
   results = service.files().list(
       spaces="drive", orderBy="modifiedTime desc", fields="nextPageToken, files(modifiedTime)"
