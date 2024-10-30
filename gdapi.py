@@ -139,6 +139,21 @@ def print_index_table():
           '    API request</a> again, you should go back to the auth flow.' +
           '</td></tr></table>')
 
+def hasNewImage():
+  #service = self.service
+  results = service.files().list(
+      spaces="drive", orderBy="modifiedTime desc", fields="nextPageToken, files(modifiedTime)"
+    ).execute()
+
+  items = results.get('files', [])
+  lastCreationDate = None #made to merge git without issue
+  return items[0]["modifiedTime"] > lastCreationDate #TODO?
+  
+  #Retrieve a list of all files from google drive (files.list method)
+  #Get the most recent creation date
+  #Compare against a variable "lastcreationdate"
+
+
 
 if __name__ == '__main__':
   # When running locally, disable OAuthlib's HTTPs verification.
@@ -149,3 +164,4 @@ if __name__ == '__main__':
   # Specify a hostname and port that are set as a valid redirect URI
   # for your API project in the Google API Console.
   app.run('localhost', 8080, debug=True)
+
