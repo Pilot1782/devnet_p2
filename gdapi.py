@@ -5,6 +5,8 @@ import requests
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
 import googleapiclient.discovery
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # This variable specifies the name of a file that contains the OAuth 2.0
 # information for this application, including its client_id and client_secret.
@@ -23,6 +25,7 @@ app = flask.Flask(__name__)
 app.secret_key = 'bazingaaosmrvfpeanmgaaogmaeo[gmadgsdfasdfsafsgfsg]'
 
 current_credentials = None
+service = None
 
 @app.route('/')
 def index():
@@ -78,8 +81,8 @@ def oauth2callback():
   # Store credentials in the session.
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
-  credentials = flow.credentials
-  current_credentials = credentials
+  current_credentials = flow.credentials
+  build("drive", "v3", credentials=current_credentials)
 
   return flask.redirect(flask.url_for('test_api_request'))
 

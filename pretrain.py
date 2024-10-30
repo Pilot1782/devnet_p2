@@ -1,9 +1,8 @@
 # Download latest version
-import os
-import shutil
 
 import cv2
 import kagglehub
+import matplotlib.pyplot as plt
 import numpy as np
 
 path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
@@ -113,48 +112,107 @@ def preprocess_image(_image: np.ndarray) -> np.ndarray:
     return out
 
 
+def white_balance(_img):
+    result = cv2.cvtColor(_img, cv2.COLOR_RGB2LAB)
+    avg_a = np.average(result[:, :, 1])
+    avg_b = np.average(result[:, :, 2])
+    result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1)
+    result = cv2.cvtColor(result, cv2.COLOR_LAB2RGB)
+    return result
+
+
+def prepreprocess_image(_image: np.ndarray) -> np.ndarray:
+    """
+    Takes an overhead image of a plant box and crops to the leaves in the image
+
+    :param _image: 3 channel RGB image
+    :return: list of 3 channel RGB images cropped to the leaves
+    """
+
+    # Step One: White Balance
+    _image = white_balance(_image)
+    _image = cv2.cvtColor(_image, cv2.COLOR_RGB2HSV)
+
+    # Step Two: Find Green Areas
+    green = cv2.inRange(_image, np.array([35, 50, 50]), np.array([75, 255, 255]))
+    green = cv2.bitwise_and(_image, _image, mask=green)
+    green = cv2.cvtColor(green, cv2.COLOR_HSV2RGB)
+
+    # Step Three: Divide The Image Into Leaves
+    leaves = cv2.threshold(green, 0, 255, cv2.THRESH_BINARY)[1]
+    leaf_edges = cv2.Canny(leaves, 100, 200)
+    contours, _ = cv2.findContours(leaf_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    areas = [cv2.boundingRect(contour)[2] * cv2.boundingRect(contour)[3] for contour in contours]
+    plt.plot(areas)
+    plt.show()
+
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        area = w * h
+
+        if area < 1000:
+            continue
+
+        cv2.rectangle(green, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    return green
+
+
 if __name__ == "__main__":
-    for dirs in os.listdir(path):
-        if not os.path.isdir(os.path.join(path, dirs, "healthy")):
-            os.mkdir(os.path.join(path, dirs, "healthy"))
+    drive_img = cv2.imread(
+        r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"
+        r"\image_2024-09-25_11-38-04_orange_pepper.jpg")
+    drive_img = cv2.cvtColor(drive_img, cv2.COLOR_BGR2RGB)
+    drive_img = prepreprocess_image(drive_img)
+    plt.imshow(drive_img)
+    plt.show()
 
-        if not os.path.isdir(os.path.join(path, dirs, "unhealthy")):
-            os.mkdir(os.path.join(path, dirs, "unhealthy"))
-
-        for plants in os.listdir(os.path.join(path, dirs)):
-            if "diseased" in plants.lower():
-                print("Copying", os.path.join(dirs, plants), "to unhealthy")
-
-                for image in os.listdir(os.path.join(path, dirs, plants)):
-                    if os.path.exists(os.path.join(path, dirs, "unhealthy", image)):
-                        os.remove(os.path.join(path, dirs, "unhealthy", image))
-
-                    shutil.copyfile(
-                        os.path.join(path, dirs, plants, image),
-                        os.path.join(path, dirs, "unhealthy", image)
-                    )
-
-                    img = cv2.imread(os.path.join(path, dirs, "unhealthy", image))
-                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    img = preprocess_image(img)
-                    img = np.uint8(img * 255.0)
-                    cv2.imwrite(os.path.join(path, dirs, "unhealthy", image), img)
-            elif "healthy" in plants.lower() and "unhealthy" not in plants.lower() and plants.lower() != "healthy":
-                print("Copying", os.path.join(dirs, plants), "to healthy")
-
-                for image in os.listdir(os.path.join(path, dirs, plants)):
-                    if os.path.exists(os.path.join(path, dirs, "healthy", image)):
-                        os.remove(os.path.join(path, dirs, "healthy", image))
-
-                    shutil.copyfile(
-                        os.path.join(path, dirs, plants, image),
-                        os.path.join(path, dirs, "healthy", image)
-                    )
-
-                    img = cv2.imread(os.path.join(path, dirs, "healthy", image))
-                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                    img = preprocess_image(img)
-                    img = np.uint8(img * 255.0)
-                    cv2.imwrite(os.path.join(path, dirs, "healthy", image), img)
-            else:
-                print("Skipping", os.path.join(dirs, plants))
+    # for dirs in os.listdir(path):
+    #     if not os.path.isdir(os.path.join(path, dirs, "healthy")):
+    #         os.mkdir(os.path.join(path, dirs, "healthy"))
+    # 
+    #     if not os.path.isdir(os.path.join(path, dirs, "unhealthy")):
+    #         os.mkdir(os.path.join(path, dirs, "unhealthy"))
+    # 
+    #     for plants in os.listdir(os.path.join(path, dirs)):
+    #         if "diseased" in plants.lower():
+    #             print("Copying", os.path.join(dirs, plants), "to unhealthy")
+    # 
+    #             for image in os.listdir(os.path.join(path, dirs, plants)):
+    #                 if os.path.exists(os.path.join(path, dirs, "unhealthy", image)):
+    #                     os.remove(os.path.join(path, dirs, "unhealthy", image))
+    # 
+    #                 shutil.copyfile(
+    #                     os.path.join(path, dirs, plants, image),
+    #                     os.path.join(path, dirs, "unhealthy", image)
+    #                 )
+    # 
+    #                 img = cv2.imread(os.path.join(path, dirs, "unhealthy", image))
+    #                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    #                 img = preprocess_image(img)
+    #                 img = np.uint8(img * 255.0)
+    #                 cv2.imwrite(os.path.join(path, dirs, "unhealthy", image), img)
+    #         elif (
+    #                 "healthy" in plants.lower()
+    #                 and "unhealthy" not in plants.lower()
+    #                 and plants.lower() != "healthy"
+    #         ):
+    #             print("Copying", os.path.join(dirs, plants), "to healthy")
+    # 
+    #             for image in os.listdir(os.path.join(path, dirs, plants)):
+    #                 if os.path.exists(os.path.join(path, dirs, "healthy", image)):
+    #                     os.remove(os.path.join(path, dirs, "healthy", image))
+    # 
+    #                 shutil.copyfile(
+    #                     os.path.join(path, dirs, plants, image),
+    #                     os.path.join(path, dirs, "healthy", image)
+    #                 )
+    # 
+    #                 img = cv2.imread(os.path.join(path, dirs, "healthy", image))
+    #                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    #                 img = preprocess_image(img)
+    #                 img = np.uint8(img * 255.0)
+    #                 cv2.imwrite(os.path.join(path, dirs, "healthy", image), img)
+    #         else:
+    #             print("Skipping", os.path.join(dirs, plants))
