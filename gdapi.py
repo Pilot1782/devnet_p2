@@ -82,7 +82,7 @@ def oauth2callback():
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
   current_credentials = flow.credentials
-  build("drive", "v3", credentials=current_credentials)
+  service = build("drive", "v3", credentials=current_credentials)
 
   return flask.redirect(flask.url_for('test_api_request'))
 
@@ -143,7 +143,6 @@ def print_index_table():
           '</td></tr></table>')
 
 def hasNewImage():
-  #service = self.service
   results = service.files().list(
       spaces="drive", orderBy="modifiedTime desc", fields="nextPageToken, files(modifiedTime)"
     ).execute()
