@@ -3,9 +3,7 @@ import flask
 import requests
 from datetime import datetime
 
-import google.oauth2.credentials
 import google_auth_oauthlib.flow
-import googleapiclient.discovery
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -27,7 +25,7 @@ app.secret_key = 'bazingaaosmrvfpeanmgaaogmaeo[gmadgsdfasdfsafsgfsg]'
 
 current_credentials = None
 service = None
-lastImageName = ""
+lastImageData = { "id": "" }
 
 @app.route('/')
 def index():
@@ -155,9 +153,9 @@ def getNewImage():
   items = results.get('files', [])
   newestImg = items[0]
 
-  global lastImageName
-  newestImg["prevRecieved"] = lastImageName == newestImg["name"]
-  lastImageName = newestImg["name"]
+  global lastImageData
+  newestImg["prevRecieved"] = lastImageData["id"] == newestImg["id"]
+  lastImageData = newestImg
   #modifiedTime = datetime.strptime(items[0]["modifiedTime"][:-5], "%Y-%m-%dT%H:%M:%S")
   return newestImg
 #str(modifiedTime.timestamp() > lastCreationDate) #TODO?
@@ -166,6 +164,9 @@ def getNewImage():
   #Get the most recent creation date
   #Compare against a variable "lastcreationdate"
 
+@app.route("/view")
+def viewCurrentData():
+  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"])
 
 
 if __name__ == '__main__':
