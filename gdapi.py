@@ -149,7 +149,7 @@ def print_index_table():
 @app.route("/test")
 def getNewImage():
   results = service.files().list(
-      q="'1PNm562W_IqKJ8Zxl8bz03p_yiEZoh88W' in parents", spaces="drive", orderBy="name_natural desc", fields="nextPageToken, files(modifiedTime, name)"
+      q="'1PNm562W_IqKJ8Zxl8bz03p_yiEZoh88W' in parents", spaces="drive", orderBy="name_natural desc", fields="nextPageToken, files(id, modifiedTime, name)"
     ).execute()
 # all files from specific folder name with link
   items = results.get('files', [])
