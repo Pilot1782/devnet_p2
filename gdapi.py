@@ -1,6 +1,7 @@
 import os
 import flask
 import requests
+from datetime import datetime
 
 import google.oauth2.credentials
 import google_auth_oauthlib.flow
@@ -26,6 +27,7 @@ app.secret_key = 'bazingaaosmrvfpeanmgaaogmaeo[gmadgsdfasdfsafsgfsg]'
 
 current_credentials = None
 service = None
+lastImageName = ""
 
 @app.route('/')
 def index():
@@ -82,9 +84,11 @@ def oauth2callback():
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
   current_credentials = flow.credentials
+
+  global service
   service = build("drive", "v3", credentials=current_credentials)
 
-  return flask.redirect(flask.url_for('test_api_request'))
+  return flask.redirect("/test")#flask.url_for('test_api_request'))
 
 
 @app.route('/revoke')
@@ -143,14 +147,20 @@ def print_index_table():
           '</td></tr></table>')
 
 @app.route("/test")
-def hasNewImage():
+def getNewImage():
   results = service.files().list(
-      spaces="drive", orderBy="modifiedTime desc", fields="nextPageToken, files(modifiedTime)"
+      q="'1PNm562W_IqKJ8Zxl8bz03p_yiEZoh88W' in parents", spaces="drive", orderBy="name_natural desc", fields="nextPageToken, files(modifiedTime, name)"
     ).execute()
-
+# all files from specific folder name with link
   items = results.get('files', [])
-  lastCreationDate = None #made to merge git without issue
-  return items[0]["modifiedTime"] > lastCreationDate #TODO?
+  newestImg = items[0]
+
+  global lastImageName
+  newestImg["prevRecieved"] = lastImageName == newestImg["name"]
+  lastImageName = newestImg["name"]
+  #modifiedTime = datetime.strptime(items[0]["modifiedTime"][:-5], "%Y-%m-%dT%H:%M:%S")
+  return newestImg
+#str(modifiedTime.timestamp() > lastCreationDate) #TODO?
   
   #Retrieve a list of all files from google drive (files.list method)
   #Get the most recent creation date
