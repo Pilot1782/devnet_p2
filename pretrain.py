@@ -122,6 +122,47 @@ def white_balance(_img):
     return result
 
 
+def water_split(image: np.ndarray) -> list[np.ndarray]:
+    """
+    Splits the contour into separate contours. By watershed splitting
+    Args:
+        image: the image to split
+
+    Returns: list of contours
+    """
+
+    out = []
+
+    filled = np.zeros_like(image)
+    contour, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(filled, [contour], -1, ((255) * image.shape[2]), -1)
+    plt.imshow(filled)
+    plt.show()
+
+    for i in range(1000):
+        k = np.ones((i, i), np.uint8)
+        eroded = cv2.erode(filled, k)
+
+        if np.sum(eroded) == 0:
+            print("Erosion complete")
+            break
+
+        contours, _ = cv2.findContours(eroded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+        if len(contours) > 1:
+            plt.imshow(eroded)
+            plt.show()
+
+            for cnt in contours:
+                full = np.zeros_like(filled)
+                cv2.drawContours(full, [cnt], -1, 255, -1)
+                full = cv2.dilate(full, k)
+                cnt, _ = cv2.findContours(full, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                out.append(cnt[0])
+
+    return out
+
+
 def prepreprocess_image(_image: np.ndarray) -> np.ndarray:
     """
     Takes an overhead image of a plant box and crops to the leaves in the image
@@ -135,26 +176,37 @@ def prepreprocess_image(_image: np.ndarray) -> np.ndarray:
     _image = cv2.cvtColor(_image, cv2.COLOR_RGB2HSV)
 
     # Step Two: Find Green Areas
-    green = cv2.inRange(_image, np.array([35, 50, 50]), np.array([75, 255, 255]))
+    green = cv2.inRange(_image, np.array([35, 50, 40]), np.array([75, 255, 255]))
     green = cv2.bitwise_and(_image, _image, mask=green)
     green = cv2.cvtColor(green, cv2.COLOR_HSV2RGB)
 
     # Step Three: Divide The Image Into Leaves
     leaves = cv2.threshold(green, 0, 255, cv2.THRESH_BINARY)[1]
     leaf_edges = cv2.Canny(leaves, 100, 200)
+    leaf_edges = cv2.dilate(leaf_edges, np.ones((3, 3), np.uint8), iterations=1)
     contours, _ = cv2.findContours(leaf_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    areas = [cv2.boundingRect(contour)[2] * cv2.boundingRect(contour)[3] for contour in contours]
-    plt.plot(areas)
-    plt.show()
 
     for contour in contours:
-        x, y, w, h = cv2.boundingRect(contour)
-        area = w * h
-
-        if area < 1000:
+        area = cv2.contourArea(contour)
+        if area < 1000:  # Filter out small contours
             continue
 
-        cv2.rectangle(green, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        thresh = 0.5
+
+        cv2.drawContours(green, [contour], -1, (0, 255, 0), -1)
+
+        hull = cv2.convexHull(contour)
+        pdiff = (cv2.contourArea(hull) - area) / area
+        cv2.drawContours(green, [hull], -1, (255, 0, 255 if pdiff > thresh else 0), 3)
+
+        print(f"Percent diff of areas: {pdiff * 100:.2f}% {'FLAGGED' if pdiff > thresh else ''}")
+
+        if pdiff > thresh:
+            tmp = np.zeros_like(green)
+            cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
+            split = water_split(tmp)
+            for s in split:
+                cv2.drawContours(green, [s], -1, (255, 255, 0), 3)
 
     return green
 
@@ -162,7 +214,7 @@ def prepreprocess_image(_image: np.ndarray) -> np.ndarray:
 if __name__ == "__main__":
     drive_img = cv2.imread(
         r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"
-        r"\image_2024-09-25_11-38-04_orange_pepper.jpg")
+        r"\image_2024-09-25_12-06-41_orange_pepper.jpg")
     drive_img = cv2.cvtColor(drive_img, cv2.COLOR_BGR2RGB)
     drive_img = prepreprocess_image(drive_img)
     plt.imshow(drive_img)
