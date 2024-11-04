@@ -1,3 +1,15 @@
-body {
-    background-color: darkblue;
+.true {
+    color: green
 }
+
+.false {
+    color:red
+}
+body {
+    h3 {  
+        font-size: x-large;
+    }
+    text-align: center;
+    background-color: lightgrey;
+    font-family: 'Courier New', Courier, monospace;
+} 

@@ -166,7 +166,8 @@ def getNewImage():
 
 @app.route("/view")
 def viewCurrentData():
-  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"])
+  #TODO: IsHealthy is a boolean indicating whether the plant is healthy or not healthy.
+  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=False)
 
 
 if __name__ == '__main__':
