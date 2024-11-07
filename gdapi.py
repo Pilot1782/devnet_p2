@@ -158,7 +158,7 @@ def getNewImage():
   lastImageData = newestImg
   #modifiedTime = datetime.strptime(items[0]["modifiedTime"][:-5], "%Y-%m-%dT%H:%M:%S")
   return newestImg
-#str(modifiedTime.timestamp() > lastCreationDate) #TODO?
+#str(modifiedTime.timestamp() > lastCreationDate)
   
   #Retrieve a list of all files from google drive (files.list method)
   #Get the most recent creation date
@@ -167,7 +167,7 @@ def getNewImage():
 @app.route("/view")
 def viewCurrentData():
   #TODO: IsHealthy is a boolean indicating whether the plant is healthy or not healthy.
-  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=False)
+  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=True)
 
 
 if __name__ == '__main__':
