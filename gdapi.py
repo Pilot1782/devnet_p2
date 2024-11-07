@@ -1,3 +1,4 @@
+import json
 import os
 import flask
 import requests
@@ -26,6 +27,23 @@ app.secret_key = 'bazingaaosmrvfpeanmgaaogmaeo[gmadgsdfasdfsafsgfsg]'
 current_credentials = None
 service = None
 lastImageData = { "id": "" }
+
+def saveData():
+  #json_LastImgData = json.dumps(lastImageData)
+  global lastImageData, current_credentials
+  credAndLastImgData = { 'creds': current_credentials, 'imgData':  lastImageData }
+  with open('data.json', 'w') as data:
+    #current cred, lastimagedata
+    data.seek(0)
+    json.dump(credAndLastImgData, data)
+    data.truncate()
+
+def loadData():
+  global lastImageData, current_credentials
+  with open('data.json', 'r') as data:
+    newData = json.load(data)
+    current_credentials = newData['creds']
+    lastImageData = newData['imgData']
 
 @app.route('/')
 def index():
@@ -82,6 +100,7 @@ def oauth2callback():
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
   current_credentials = flow.credentials
+  saveData()
 
   global service
   service = build("drive", "v3", credentials=current_credentials)
@@ -91,6 +110,7 @@ def oauth2callback():
 
 @app.route('/revoke')
 def revoke():
+  global current_credentials
   if current_credentials is not None:
     current_credentials = None
   else:
@@ -156,9 +176,10 @@ def getNewImage():
   global lastImageData
   newestImg["prevRecieved"] = lastImageData["id"] == newestImg["id"]
   lastImageData = newestImg
+  saveData()
   #modifiedTime = datetime.strptime(items[0]["modifiedTime"][:-5], "%Y-%m-%dT%H:%M:%S")
   return newestImg
-#str(modifiedTime.timestamp() > lastCreationDate) #TODO?
+#str(modifiedTime.timestamp() > lastCreationDate)
   
   #Retrieve a list of all files from google drive (files.list method)
   #Get the most recent creation date
@@ -167,7 +188,8 @@ def getNewImage():
 @app.route("/view")
 def viewCurrentData():
   #TODO: IsHealthy is a boolean indicating whether the plant is healthy or not healthy.
-  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=False)
+  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=True)
+
 
 
 if __name__ == '__main__':
@@ -175,6 +197,8 @@ if __name__ == '__main__':
   # ACTION ITEM for developers:
   #     When running in production *do not* leave this option enabled.
   os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
+  loadData()
 
   # Specify a hostname and port that are set as a valid redirect URI
   # for your API project in the Google API Console.

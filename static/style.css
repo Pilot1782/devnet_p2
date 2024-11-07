@@ -8,6 +8,7 @@
 body {
     h3 {  
         font-size: x-large;
+        font-weight: 900;
     }
     text-align: center;
     background-color: lightgrey;
