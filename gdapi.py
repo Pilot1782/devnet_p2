@@ -100,7 +100,7 @@ def oauth2callback():
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
   current_credentials = flow.credentials
-  saveData()
+  #saveData()
 
   global service
   service = build("drive", "v3", credentials=current_credentials)
@@ -176,9 +176,9 @@ def getNewImage():
   global lastImageData
   newestImg["prevRecieved"] = lastImageData["id"] == newestImg["id"]
   lastImageData = newestImg
-  saveData()
+  #saveData()
   #modifiedTime = datetime.strptime(items[0]["modifiedTime"][:-5], "%Y-%m-%dT%H:%M:%S")
-  return newestImg
+  return flask.redirect("/view")#newestImg #TODO:revert
 #str(modifiedTime.timestamp() > lastCreationDate)
   
   #Retrieve a list of all files from google drive (files.list method)
@@ -190,6 +190,10 @@ def viewCurrentData():
   #TODO: IsHealthy is a boolean indicating whether the plant is healthy or not healthy.
   return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=True)
 
+@app.route("/trainModel")
+def trainModel():
+  pass
+
 
 
 if __name__ == '__main__':
@@ -198,7 +202,7 @@ if __name__ == '__main__':
   #     When running in production *do not* leave this option enabled.
   os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-  loadData()
+  #loadData()
 
   # Specify a hostname and port that are set as a valid redirect URI
   # for your API project in the Google API Console.

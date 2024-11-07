@@ -5,6 +5,13 @@
 .false {
     color:red
 }
+
+button {
+    cursor: pointer;
+    font-size: larger;
+    width: 5vw;
+}
+
 body {
     h3 {  
         font-size: x-large;
