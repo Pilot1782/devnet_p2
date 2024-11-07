@@ -27,9 +27,9 @@ batch_size = 16
 classes = ("healthy", "unhealthy")
 
 
-class HealthModel(nn.Module):
+class HealthNetwork(nn.Module):
     def __init__(self):
-        super(HealthModel, self).__init__()
+        super(HealthNetwork, self).__init__()
 
         self.seq = nn.Sequential(
             nn.Conv2d(3, 32, (2, 2)),
@@ -255,7 +255,7 @@ def find_classes(
     return _classes, class_to_idx
 
 
-model = HealthModel()
+model = HealthNetwork()
 
 device = 'cpu'
 if torch.cuda.is_available():
