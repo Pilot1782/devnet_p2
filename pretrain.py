@@ -143,7 +143,6 @@ def water_split(_image: np.ndarray) -> list[np.ndarray]:
     section_area = cv2.contourArea(contour)
 
     for i in range(1000):
-        print(f"Erosion attempt {i}{' ' * 10}", end="\r")
         k = np.ones((i, i), np.uint8)
         eroded = cv2.erode(filled, k)
 
@@ -175,7 +174,6 @@ def water_split(_image: np.ndarray) -> list[np.ndarray]:
                 out.append(cnt[0])
 
             if len(out) > 1:
-                print(f"Area diff after erosion attempt {i}: {(total_area - before_area) / before_area * 100:.3f}%")
                 break
             out = []
 
@@ -204,7 +202,7 @@ def is_closed(contour):
     return cv2.contourArea(contour) > cv2.arcLength(contour, True)
 
 
-def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
+def prepreprocess_image(_image: np.ndarray, __debug=True) -> tuple[np.ndarray]:
     """
     Takes an overhead image of a plant box and crops to the leaves in the image
 
@@ -222,6 +220,15 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
         plt.xticks([])
         plt.yticks([])
         plt.title("Orig")
+
+    # add a 5px black border
+    r = np.pad(_image[:, :, 0], 5, mode='constant', constant_values=0)
+    g = np.pad(_image[:, :, 1], 5, mode='constant', constant_values=0)
+    b = np.pad(_image[:, :, 2], 5, mode='constant', constant_values=0)
+    _image.resize((r.shape[0], r.shape[1], 3))
+    _image[:, :, 0] = r
+    _image[:, :, 1] = g
+    _image[:, :, 2] = b
 
     _image = cv2.cvtColor(_image, cv2.COLOR_RGB2HSV)
 
@@ -287,7 +294,9 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
             pdiff = (cv2.contourArea(hull) - area) / area
 
             if pdiff > thresh:
-                print(f"Percent diff of areas: {pdiff * 100:.2f}% {'FLAGGED' if pdiff > thresh else ''}")
+                if __debug:
+                    print(f"Percent diff of areas: {pdiff * 100:.2f}% {'FLAGGED' if pdiff > thresh else ''}")
+
                 has_multi_leaf = True
                 tmp = np.zeros_like(green)
                 cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
@@ -305,7 +314,8 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
     for contour in fixed_cnts:
         mask = np.zeros_like(green)
         cv2.drawContours(mask, [contour], -1, (255, 255, 255), -1)
-        cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
+        cv2.drawContours(tmp, [contour], -1, (np.random.randint(255), np.random.randint(255), np.random.randint(255)),
+                         -1)
         mask = np.uint8(np.average(mask, 2))
 
         _leaf = cv2.bitwise_and(_image, _image, mask=mask)

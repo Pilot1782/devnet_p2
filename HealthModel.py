@@ -3,6 +3,7 @@ from typing import Union
 import numpy as np
 import requests
 import torch
+from PIL import Image
 from numpy import ndarray
 from torch import Tensor
 from torchvision.transforms import transforms
@@ -25,6 +26,8 @@ class HealthModel:
         ])
         self.__device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        self.__model = self.__model.to(self.__device)
+
     def _image_loader(self, image: ndarray) -> Tensor:
         """
         Loads an image
@@ -34,23 +37,37 @@ class HealthModel:
         Returns:
             The tensor
         """
+        image = Image.fromarray(image, mode="RGB")
         image = self.__loader(image).float()
         image = image.unsqueeze(0)
         return image.cuda()
 
-    def predict(self, image: Union[str, ndarray], multi_leaf=True) -> tuple[str, float]:
+    def _predict(self, image):
+        self.__model.eval()
+        with torch.no_grad():
+            image.to(self.__device)
+
+            output = self.__model(image)
+
+            index = output.data.cpu().numpy().argmax()
+            ps = output.data.cpu().numpy()
+
+        return index, ps[0].max()
+
+    def predict(self, image: Union[str, ndarray], multi_leaf=True, __debug=False) -> tuple[str, float]:
         """
         Predicts the health of the plant
 
         Args:
             image: path to image or a numpy array of the image (must be RGB)
             multi_leaf: whether to use multi leaf prediction or not
+            __debug: whether to show debugging images
 
         Returns:
             class, confidence: The health of the plant as either "healthy" or "unhealthy" and the confidence in the prediction
         """
 
-        if type(image) is str:
+        if type(image) is str and image.split(".")[-1] in ("png", "jpg", "webp"):
             image = np.array(requests.get(image, stream=True).raw)
 
         images = [image]
@@ -59,25 +76,20 @@ class HealthModel:
 
         images = [self._image_loader(preprocess_image(image)) for image in images]
 
-        predictions = []
+        healths = np.float64(np.array(list(range(len(images)))))
+        confs = np.float64(np.array(list(range(len(images)))))
 
-        for image in images:
-            with torch.no_grad():
-                self.__model.eval()
-                out = self.__model(image)
-                pred = out.data.cpu().numpy()
+        for i in range(len(images)):
+            health, confidence = self._predict(images[i])
+            healths[i] = health
+            confs[i] = confidence
 
-                health = pred.argmax()
-                confidence = pred[pred.max()]
-
-                predictions.append((health, confidence))
-
-        avg_health = round(sum((i[0] for i in predictions)) / len(predictions))
-        avg_confidence = round(sum((i[1] for i in predictions)) / len(predictions))
+        avg_health = round(np.average(healths))
+        avg_confidence = float(np.average(confs))
 
         return classes[avg_health], avg_confidence
 
 
 if __name__ == '__main__':
     model = HealthModel('weights.pth')
-    print(model.predict())
+    print(model.predict(r"C:\Users\carso\Downloads\devnet-sample-images\image_2024-10-06_12-30-03_orange_pepper.jpg"))
