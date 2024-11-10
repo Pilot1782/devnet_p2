@@ -1,15 +1,18 @@
 # Download latest version
+import os
+import shutil
 
 import cv2
 import kagglehub
-import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
 
-path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
+if __name__ == "__main__":
+    path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
+else:
+    path = "..."
 
 path += r"\Plants_2"
-
-print("Path to dataset files:", path)
 
 
 def laplace_of_gaussian(gray_img, sigma=1., kappa=0.75, pad=False):
@@ -104,8 +107,6 @@ def preprocess_image(_image: np.ndarray) -> np.ndarray:
 
     out[:, :, 2] = brown
 
-    out = cv2.cvtColor(out, cv2.COLOR_BGR2RGB)
-
     out = np.float64(out)
     out = out / 255.0
 
@@ -122,24 +123,27 @@ def white_balance(_img):
     return result
 
 
-def water_split(image: np.ndarray) -> list[np.ndarray]:
+def water_split(_image: np.ndarray) -> list[np.ndarray]:
     """
     Splits the contour into separate contours. By watershed splitting
     Args:
-        image: the image to split
+        _image: the image to split as a monochrome image
 
     Returns: list of contours
     """
 
     out = []
 
-    filled = np.zeros_like(image)
-    contour, _ = cv2.findContours(image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    cv2.drawContours(filled, [contour], -1, ((255) * image.shape[2]), -1)
-    plt.imshow(filled)
-    plt.show()
+    _image = np.uint8(_image)
+    filled = np.zeros_like(_image)
+    contour, _ = cv2.findContours(_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    contour = contour[0]
+    cv2.drawContours(filled, [contour], -1, 255, -1)
+
+    section_area = cv2.contourArea(contour)
 
     for i in range(1000):
+        print(f"Erosion attempt {i}{' ' * 10}", end="\r")
         k = np.ones((i, i), np.uint8)
         eroded = cv2.erode(filled, k)
 
@@ -150,29 +154,75 @@ def water_split(image: np.ndarray) -> list[np.ndarray]:
         contours, _ = cv2.findContours(eroded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         if len(contours) > 1:
-            plt.imshow(eroded)
-            plt.show()
+            total_area = 0
+            before_area = 0
 
             for cnt in contours:
+                before_area += cv2.contourArea(cnt)
+
                 full = np.zeros_like(filled)
                 cv2.drawContours(full, [cnt], -1, 255, -1)
+
                 full = cv2.dilate(full, k)
                 cnt, _ = cv2.findContours(full, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                cnt_area = cv2.contourArea(cnt[0])
+                total_area += cnt_area
+
+                if cnt_area * 1.25 < section_area / len(contours):
+                    continue
+
                 out.append(cnt[0])
+
+            if len(out) > 1:
+                print(f"Area diff after erosion attempt {i}: {(total_area - before_area) / before_area * 100:.3f}%")
+                break
+            out = []
 
     return out
 
 
-def prepreprocess_image(_image: np.ndarray) -> np.ndarray:
+def crop_to_content(_image: np.ndarray) -> np.ndarray:
+    """
+    Removes and black bars around the edges
+    
+    :param _image: some image as a ndarray
+    :return: the image after cropping
+    """
+
+    gray = cv2.cvtColor(_image, cv2.COLOR_RGB2GRAY)
+
+    _, thresh = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
+
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    x, y, w, h = cv2.boundingRect(contours[0])
+
+    return _image[y:y + h, x:x + w]
+
+
+def is_closed(contour):
+    return cv2.contourArea(contour) > cv2.arcLength(contour, True)
+
+
+def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
     """
     Takes an overhead image of a plant box and crops to the leaves in the image
 
+    :param __debug: Whether debugging images should be shown
     :param _image: 3 channel RGB image
     :return: list of 3 channel RGB images cropped to the leaves
     """
 
     # Step One: White Balance
     _image = white_balance(_image)
+
+    if __debug:
+        plt.subplot(2, 3, 1)
+        plt.imshow(_image)
+        plt.xticks([])
+        plt.yticks([])
+        plt.title("Orig")
+
     _image = cv2.cvtColor(_image, cv2.COLOR_RGB2HSV)
 
     # Step Two: Find Green Areas
@@ -180,91 +230,146 @@ def prepreprocess_image(_image: np.ndarray) -> np.ndarray:
     green = cv2.bitwise_and(_image, _image, mask=green)
     green = cv2.cvtColor(green, cv2.COLOR_HSV2RGB)
 
+    if __debug:
+        plt.subplot(2, 3, 2)
+        plt.imshow(green)
+        plt.xticks([])
+        plt.yticks([])
+        plt.title("Green")
+
     # Step Three: Divide The Image Into Leaves
     leaves = cv2.threshold(green, 0, 255, cv2.THRESH_BINARY)[1]
     leaf_edges = cv2.Canny(leaves, 100, 200)
     leaf_edges = cv2.dilate(leaf_edges, np.ones((3, 3), np.uint8), iterations=1)
+
+    if __debug:
+        plt.subplot(2, 3, 3)
+        plt.imshow(leaf_edges)
+        plt.xticks([])
+        plt.yticks([])
+        plt.title("Edges")
+
     contours, _ = cv2.findContours(leaf_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    tmp = ()
 
     for contour in contours:
-        area = cv2.contourArea(contour)
-        if area < 1000:  # Filter out small contours
-            continue
+        if not is_closed(contour):
+            contour = cv2.approxPolyDP(contour, 0.001 * cv2.arcLength(contour, True), True)
+        tmp += (contour,)
 
-        thresh = 0.5
+    tmp = np.zeros_like(_image)
+    cv2.drawContours(tmp, contours, -1, (255, 255, 255), -1)
 
-        cv2.drawContours(green, [contour], -1, (0, 255, 0), -1)
+    if __debug:
+        plt.subplot(2, 3, 4)
+        plt.imshow(tmp)
+        plt.xticks([])
+        plt.yticks([])
+        plt.title("Contours")
 
-        hull = cv2.convexHull(contour)
-        pdiff = (cv2.contourArea(hull) - area) / area
-        cv2.drawContours(green, [hull], -1, (255, 0, 255 if pdiff > thresh else 0), 3)
+    has_multi_leaf = True
+    fixed_cnts = contours
+    while has_multi_leaf:
+        has_multi_leaf = False
 
-        print(f"Percent diff of areas: {pdiff * 100:.2f}% {'FLAGGED' if pdiff > thresh else ''}")
+        tmp_contours = ()
+        for contour in fixed_cnts:
+            if not is_closed(contour):
+                continue
 
-        if pdiff > thresh:
-            tmp = np.zeros_like(green)
-            cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
-            split = water_split(tmp)
-            for s in split:
-                cv2.drawContours(green, [s], -1, (255, 255, 0), 3)
+            area = cv2.contourArea(contour)
+            if area < 1000:  # Filter out small contours
+                continue
 
-    return green
+            thresh = 0.5
+
+            hull = cv2.convexHull(contour)
+            pdiff = (cv2.contourArea(hull) - area) / area
+
+            if pdiff > thresh:
+                print(f"Percent diff of areas: {pdiff * 100:.2f}% {'FLAGGED' if pdiff > thresh else ''}")
+                has_multi_leaf = True
+                tmp = np.zeros_like(green)
+                cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
+                tmp = np.average(tmp, 2)
+                split = water_split(tmp)
+                for s in split:
+                    tmp_contours += (s,)
+            else:
+                tmp_contours += (contour,)
+
+        fixed_cnts = tmp_contours
+
+    out = []
+    tmp = np.zeros_like(_image)
+    for contour in fixed_cnts:
+        mask = np.zeros_like(green)
+        cv2.drawContours(mask, [contour], -1, (255, 255, 255), -1)
+        cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
+        mask = np.uint8(np.average(mask, 2))
+
+        _leaf = cv2.bitwise_and(_image, _image, mask=mask)
+        _leaf = cv2.cvtColor(_leaf, cv2.COLOR_HSV2RGB)
+        _leaf = crop_to_content(_leaf)
+        out.append(_leaf)
+
+    if __debug:
+        plt.subplot(2, 3, 5)
+        plt.imshow(tmp)
+        plt.xticks([])
+        plt.yticks([])
+        plt.title("Final")
+        plt.show()
+
+    return out
 
 
 if __name__ == "__main__":
-    drive_img = cv2.imread(
-        r"C:\Users\pilot1784\Downloads\drive-download-20241016T233706Z-001"
-        r"\image_2024-09-25_12-06-41_orange_pepper.jpg")
-    drive_img = cv2.cvtColor(drive_img, cv2.COLOR_BGR2RGB)
-    drive_img = prepreprocess_image(drive_img)
-    plt.imshow(drive_img)
-    plt.show()
+    for dirs in os.listdir(path):
+        if not os.path.isdir(os.path.join(path, dirs, "healthy")):
+            os.mkdir(os.path.join(path, dirs, "healthy"))
 
-    # for dirs in os.listdir(path):
-    #     if not os.path.isdir(os.path.join(path, dirs, "healthy")):
-    #         os.mkdir(os.path.join(path, dirs, "healthy"))
-    # 
-    #     if not os.path.isdir(os.path.join(path, dirs, "unhealthy")):
-    #         os.mkdir(os.path.join(path, dirs, "unhealthy"))
-    # 
-    #     for plants in os.listdir(os.path.join(path, dirs)):
-    #         if "diseased" in plants.lower():
-    #             print("Copying", os.path.join(dirs, plants), "to unhealthy")
-    # 
-    #             for image in os.listdir(os.path.join(path, dirs, plants)):
-    #                 if os.path.exists(os.path.join(path, dirs, "unhealthy", image)):
-    #                     os.remove(os.path.join(path, dirs, "unhealthy", image))
-    # 
-    #                 shutil.copyfile(
-    #                     os.path.join(path, dirs, plants, image),
-    #                     os.path.join(path, dirs, "unhealthy", image)
-    #                 )
-    # 
-    #                 img = cv2.imread(os.path.join(path, dirs, "unhealthy", image))
-    #                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #                 img = preprocess_image(img)
-    #                 img = np.uint8(img * 255.0)
-    #                 cv2.imwrite(os.path.join(path, dirs, "unhealthy", image), img)
-    #         elif (
-    #                 "healthy" in plants.lower()
-    #                 and "unhealthy" not in plants.lower()
-    #                 and plants.lower() != "healthy"
-    #         ):
-    #             print("Copying", os.path.join(dirs, plants), "to healthy")
-    # 
-    #             for image in os.listdir(os.path.join(path, dirs, plants)):
-    #                 if os.path.exists(os.path.join(path, dirs, "healthy", image)):
-    #                     os.remove(os.path.join(path, dirs, "healthy", image))
-    # 
-    #                 shutil.copyfile(
-    #                     os.path.join(path, dirs, plants, image),
-    #                     os.path.join(path, dirs, "healthy", image)
-    #                 )
-    # 
-    #                 img = cv2.imread(os.path.join(path, dirs, "healthy", image))
-    #                 img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    #                 img = preprocess_image(img)
-    #                 img = np.uint8(img * 255.0)
-    #                 cv2.imwrite(os.path.join(path, dirs, "healthy", image), img)
-    #         else:
-    #             print("Skipping", os.path.join(dirs, plants))
+        if not os.path.isdir(os.path.join(path, dirs, "unhealthy")):
+            os.mkdir(os.path.join(path, dirs, "unhealthy"))
+
+        for plants in os.listdir(os.path.join(path, dirs)):
+            if "diseased" in plants.lower():
+                print("Copying", os.path.join(dirs, plants), "to unhealthy")
+
+                for image in os.listdir(os.path.join(path, dirs, plants)):
+                    if os.path.exists(os.path.join(path, dirs, "unhealthy", image)):
+                        os.remove(os.path.join(path, dirs, "unhealthy", image))
+
+                    shutil.copyfile(
+                        os.path.join(path, dirs, plants, image),
+                        os.path.join(path, dirs, "unhealthy", image)
+                    )
+
+                    img = cv2.imread(os.path.join(path, dirs, "unhealthy", image))
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    img = preprocess_image(img)
+                    img = np.uint8(img * 255.0)
+                    cv2.imwrite(os.path.join(path, dirs, "unhealthy", image), img)
+            elif (
+                    "healthy" in plants.lower()
+                    and "unhealthy" not in plants.lower()
+                    and plants.lower() != "healthy"
+            ):
+                print("Copying", os.path.join(dirs, plants), "to healthy")
+
+                for image in os.listdir(os.path.join(path, dirs, plants)):
+                    if os.path.exists(os.path.join(path, dirs, "healthy", image)):
+                        os.remove(os.path.join(path, dirs, "healthy", image))
+
+                    shutil.copyfile(
+                        os.path.join(path, dirs, plants, image),
+                        os.path.join(path, dirs, "healthy", image)
+                    )
+
+                    img = cv2.imread(os.path.join(path, dirs, "healthy", image))
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    img = preprocess_image(img)
+                    img = np.uint8(img * 255.0)
+                    cv2.imwrite(os.path.join(path, dirs, "healthy", image), img)
+            else:
+                print("Skipping", os.path.join(dirs, plants))

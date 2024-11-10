@@ -16,9 +16,10 @@ from torchvision.transforms import transforms
 img_width, img_height = 250, 250
 
 # Download latest version
-path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
-
-print("Path to dataset files:", path)
+if __name__ == "__main__":
+    path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
+else:
+    path = "..."
 
 train_data_dir = path + r"\Plants_2\train"
 validation_data_dir = path + r"\Plants_2\valid"
@@ -255,62 +256,6 @@ def find_classes(
     return _classes, class_to_idx
 
 
-model = HealthModel()
-
-device = 'cpu'
-if torch.cuda.is_available():
-    device = 'cuda'
-
-loss_fn = nn.CrossEntropyLoss()
-optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-3)
-
-# Define the transformations for the training data
-train_transforms = transforms.Compose([
-    transforms.Resize((img_width, img_height)),
-    transforms.RandomRotation(40),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor()
-])
-
-# Define the transformations for the testing data
-test_transforms = transforms.Compose([
-    transforms.Resize((img_width, img_height)),
-    transforms.RandomRotation(40),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor()
-])
-
-# Define the transformation for the validation data
-valid_transforms = transforms.Compose([
-    transforms.Resize((250, 250)),
-    transforms.RandomRotation(40),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor()
-])
-
-# Load the training dataset
-train_dataset = FilteredImageFolder(root=train_data_dir, transform=train_transforms, allowed_classes=classes)
-print(f"Training classes: " + ", ".join(train_dataset.class_to_idx.keys()))
-
-# Load the testing dataset
-test_dataset = FilteredImageFolder(root=validation_data_dir, transform=test_transforms, allowed_classes=classes)
-print(f"Testing classes: " + ", ".join(test_dataset.class_to_idx.keys()))
-
-# Load the validating dataset
-valid_dataset = FilteredImageFolder(root=os.path.join(path, "Plants_2", "test"), transform=valid_transforms,
-                                    allowed_classes=classes)
-print(f"Validation classes: " + ", ".join(valid_dataset.class_to_idx.keys()))
-
-# Create the DataLoader for the training dataset
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-# Create the DataLoader for the testing dataset
-test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
-
-# Create the DataLoader for the validating dataset
-valid_dataloader = DataLoader(valid_dataset, batch_size=16, shuffle=True)
-
-
 def train(dataloader, _model, _loss_fn, _optimizer):
     size = len(dataloader.dataset)
     _model.train()
@@ -349,7 +294,62 @@ def test(dataloader, _model, _loss_fn):
     return correct
 
 
+model = HealthModel()
+
+device = 'cpu'
+if torch.cuda.is_available():
+    device = 'cuda'
+
+loss_fn = nn.CrossEntropyLoss()
+optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-3)
+
+# Define the transformations for the training data
+train_transforms = transforms.Compose([
+    transforms.Resize((img_width, img_height)),
+    transforms.RandomRotation(40),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor()
+])
+
+# Define the transformations for the testing data
+test_transforms = transforms.Compose([
+    transforms.Resize((img_width, img_height)),
+    transforms.RandomRotation(40),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor()
+])
+
+# Define the transformation for the validation data
+valid_transforms = transforms.Compose([
+    transforms.Resize((250, 250)),
+    transforms.RandomRotation(40),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor()
+])
+
 if __name__ == "__main__":
+    # Load the training dataset
+    train_dataset = FilteredImageFolder(root=train_data_dir, transform=train_transforms, allowed_classes=classes)
+    print(f"Training classes: " + ", ".join(train_dataset.class_to_idx.keys()))
+
+    # Load the testing dataset
+    test_dataset = FilteredImageFolder(root=validation_data_dir, transform=test_transforms, allowed_classes=classes)
+    print(f"Testing classes: " + ", ".join(test_dataset.class_to_idx.keys()))
+
+    # Load the validating dataset
+    valid_dataset = FilteredImageFolder(root=os.path.join(path, "Plants_2", "test"), transform=valid_transforms,
+                                        allowed_classes=classes)
+    print(f"Validation classes: " + ", ".join(valid_dataset.class_to_idx.keys()))
+
+    # Create the DataLoader for the training dataset
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    # Create the DataLoader for the testing dataset
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+
+    # Create the DataLoader for the validating dataset
+    valid_dataloader = DataLoader(valid_dataset, batch_size=16, shuffle=True)
+
     model = model.to(device)
     test_acc = []
     val_acc = []
