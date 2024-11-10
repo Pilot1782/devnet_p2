@@ -1,3 +1,23 @@
-body {
-    background-color: darkblue;
+.true {
+    color: green
 }
+
+.false {
+    color:red
+}
+
+button {
+    cursor: pointer;
+    font-size: larger;
+    width: 5vw;
+}
+
+body {
+    h3 {  
+        font-size: x-large;
+        font-weight: 900;
+    }
+    text-align: center;
+    background-color: lightgrey;
+    font-family: 'Courier New', Courier, monospace;
+} 
