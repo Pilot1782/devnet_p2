@@ -58,14 +58,14 @@ class HealthModel:
 
         return float(index), float(ps)
 
-    def predict(self, image: Union[str, ndarray], multi_leaf=True, __debug=False) -> tuple[str, float]:
+    def predict(self, image: Union[str, ndarray], multi_leaf=True, _debug=False) -> tuple[str, float]:
         """
         Predicts the health of the plant
 
         Args:
             image: path to image or a numpy array of the image (must be RGB)
             multi_leaf: whether to use multi leaf prediction or not
-            __debug: whether to show debugging images
+            _debug: whether to show debugging images
 
         Returns:
             class, confidence: The health of the plant as either "healthy" or "unhealthy" and the confidence in the prediction
@@ -76,7 +76,7 @@ class HealthModel:
 
         images = [image]
         if multi_leaf:
-            images = prepreprocess_image(image, __debug=__debug)
+            images = prepreprocess_image(image, __debug=_debug)
 
         images = [self._image_loader(preprocess_image(image)) for image in images]
 

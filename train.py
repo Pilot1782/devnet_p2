@@ -232,6 +232,37 @@ class FilteredImageFolder(FilteredDataFolder):
         )
 
 
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+
+    def __init__(self, name, fmt=':f'):
+        self.count = None
+        self.sum = None
+        self.avg = None
+        self.val = None
+
+        self.name = name
+        self.fmt = fmt
+
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def __str__(self):
+        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
+        return fmtstr.format(**self.__dict__)
+
+
 def find_classes(
         directory: Union[str, Path],
         allowed_classes: Optional[tuple[str]] = None
@@ -273,7 +304,7 @@ def train(dataloader, _model, _loss_fn, _optimizer):
 
         if batch % 100 == 0:
             loss, current = loss.item(), (batch + 1) * len(_input)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]{' ' * 10}", end="\r")
 
 
 def test(dataloader, _model, _loss_fn):
@@ -289,7 +320,7 @@ def test(dataloader, _model, _loss_fn):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     test_loss /= num_batches
     correct /= size
-    print(f"Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    print(f"Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f}")
 
     return correct
 
@@ -354,15 +385,18 @@ if __name__ == "__main__":
     test_acc = []
     val_acc = []
     tStart = 0
+    dTime = -999
+
     for t in range(epochs):
-        print(f"Epoch {t + 1}\n-------------------------------")
+        print(f"Epoch {t + 1}/{epochs} T-{dTime:.1f}s\n-------------------------------")
         tStart = time.time()
 
         train(train_dataloader, model, loss_fn, optimizer)
 
-        print("Test Error:", end="\n  ")
+        print("Error:")
+        print("   Valid: ", end="")
         test_acc.append(test(test_dataloader, model, loss_fn))
-        print("Validation Error:", end="\n  ")
+        print("    Test: ", end="")
         val_acc.append(test(valid_dataloader, model, loss_fn))
 
         dTime = time.time() - tStart
