@@ -1,17 +1,44 @@
 import os
 import random
+from argparse import ArgumentParser
 
 import cv2
 
 from HealthModel import HealthModel
 
 if __name__ == "__main__":
-    model = HealthModel(os.path.join(os.getcwd(), 'model.pth'))
+    parser = ArgumentParser()
+    parser.add_argument(
+        "-p", "--path",
+        help="The path to the image or image directory"
+    )
+    parser.add_argument(
+        "-w", "--weights",
+        help="The path to the weights of the model",
+        default=os.path.join(os.getcwd(), 'model.pth')
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Whether to enable very verbose and helpful debugging"
+    )
+    args = parser.parse_args()
 
-    imgs = os.listdir(r"C:\Users\carso\Downloads\devnet-sample-images")
+    model = HealthModel(args.weights)
+
+    if os.path.isdir(args.path):
+        imgs = os.listdir(args.path)
+    else:
+        imgs = [args.path]
+
     random.shuffle(imgs)
-    for img in imgs[:5]:
-        image = cv2.imread("C:\\Users\\carso\\Downloads\\devnet-sample-images\\" + img)
+    for img in imgs:
+        if img.split(".")[-1] not in ("bmp dib jpeg jpg jpe jp2 png webp "
+                                      "avif pbm pgm ppm pxm pnm pfm sr "
+                                      "ras tiff tif exr hdr pic").split(" "):
+            continue
+
+        image = cv2.imread(img)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        pred = model.predict(image, multi_leaf=not img[0].isdigit(), _debug=True)
+        pred = model.predict(image, multi_leaf=not img[0].isdigit(), _debug=args.debug)
         print(f"{img}: {pred[0].upper()} ({pred[1] * 100:.2f}%)")

@@ -1,6 +1,7 @@
 import datetime
 import os
 import time
+from argparse import ArgumentParser
 from pathlib import Path
 from typing import Union, Tuple, List, Dict, Optional, Callable, Any
 
@@ -23,8 +24,6 @@ else:
 
 train_data_dir = path + r"\Plants_2\train"
 validation_data_dir = path + r"\Plants_2\valid"
-epochs = 250
-batch_size = 16
 classes = ("healthy", "unhealthy")
 
 
@@ -287,7 +286,7 @@ def find_classes(
     return _classes, class_to_idx
 
 
-def train(dataloader, _model, _loss_fn, _optimizer):
+def train(dataloader, _model, _loss_fn, _optimizer, _silent=False):
     size = len(dataloader.dataset)
     _model.train()
     for batch, (_input, label) in enumerate(dataloader):
@@ -304,10 +303,10 @@ def train(dataloader, _model, _loss_fn, _optimizer):
 
         if batch % 100 == 0:
             loss, current = loss.item(), (batch + 1) * len(_input)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]{' ' * 10}", end="\r")
+            print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]{' ' * 10}", end="\r") if not _silent else None
 
 
-def test(dataloader, _model, _loss_fn):
+def test(dataloader, _model, _loss_fn, _silent=False):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     _model.eval()
@@ -320,7 +319,7 @@ def test(dataloader, _model, _loss_fn):
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
     test_loss /= num_batches
     correct /= size
-    print(f"Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f}")
+    print(f"Accuracy: {(100 * correct):>0.1f}%, Avg loss: {test_loss:>8f}") if not _silent else None
 
     return correct
 
@@ -359,24 +358,45 @@ valid_transforms = transforms.Compose([
 ])
 
 if __name__ == "__main__":
+    args = ArgumentParser(
+        prog="Trainer",
+        description="Trains the model based on preprocessed images"
+    )
+    args.add_argument(
+        "-e", "--epochs",
+        help="The number of epochs to train on",
+        default=250, type=int
+    )
+    args.add_argument(
+        "-b", "--batch",
+        help="The size of the batches",
+        default=16, type=int
+    )
+    args.add_argument(
+        "-s", "--silent",
+        action="store_true",
+        help="Disables all print statements"
+    )
+    args = args.parse_args()
+
     # Load the training dataset
     train_dataset = FilteredImageFolder(root=train_data_dir, transform=train_transforms, allowed_classes=classes)
-    print(f"Training classes: " + ", ".join(train_dataset.class_to_idx.keys()))
+    print(f"Training classes: " + ", ".join(train_dataset.class_to_idx.keys())) if not args.silent else None
 
     # Load the testing dataset
     test_dataset = FilteredImageFolder(root=validation_data_dir, transform=test_transforms, allowed_classes=classes)
-    print(f"Testing classes: " + ", ".join(test_dataset.class_to_idx.keys()))
+    print(f"Testing classes: " + ", ".join(test_dataset.class_to_idx.keys())) if not args.silent else None
 
     # Load the validating dataset
     valid_dataset = FilteredImageFolder(root=os.path.join(path, "Plants_2", "test"), transform=valid_transforms,
                                         allowed_classes=classes)
-    print(f"Validation classes: " + ", ".join(valid_dataset.class_to_idx.keys()))
+    print(f"Validation classes: " + ", ".join(valid_dataset.class_to_idx.keys())) if not args.silent else None
 
     # Create the DataLoader for the training dataset
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=args.batch, shuffle=True)
 
     # Create the DataLoader for the testing dataset
-    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=args.batch, shuffle=True)
 
     # Create the DataLoader for the validating dataset
     valid_dataloader = DataLoader(valid_dataset, batch_size=16, shuffle=True)
@@ -387,28 +407,30 @@ if __name__ == "__main__":
     tStart = 0
     dTime = -999
 
-    for t in range(epochs):
-        print(f"Epoch {t + 1}/{epochs} T-{dTime:.1f}s\n-------------------------------")
+    for t in range(args.epochs):
+        print(
+            f"Epoch {t + 1}/{args.epochs} T-{dTime:.1f}s\n-------------------------------"
+        ) if not args.silent else None
         tStart = time.time()
 
         train(train_dataloader, model, loss_fn, optimizer)
 
-        print("Error:")
-        print("   Valid: ", end="")
-        test_acc.append(test(test_dataloader, model, loss_fn))
-        print("    Test: ", end="")
-        val_acc.append(test(valid_dataloader, model, loss_fn))
+        print("Error:") if not args.silent else None
+        print("   Valid: ", end="") if not args.silent else None
+        test_acc.append(test(test_dataloader, model, loss_fn, args.silent))
+        print("    Test: ", end="") if not args.silent else None
+        val_acc.append(test(valid_dataloader, model, loss_fn, args.silent))
 
         dTime = time.time() - tStart
-        remaining = epochs - (t + 1)
+        remaining = args.epochs - (t + 1)
         srem = remaining * dTime
         print(
             f"ETA: {datetime.datetime.fromtimestamp(datetime.datetime.now().timestamp() + srem)}"
             f"\n-------------------------------\n"
-        )
+        ) if not args.silent else None
 
     torch.save(model.state_dict(), "model.pth")
-    print("Saved PyTorch Model State to model.pth")
+    print("Saved PyTorch Model State to model.pth") if not args.silent else None
 
     plt.plot(test_acc, label="Test Data")
     plt.plot(val_acc, label="Validation Data")
@@ -417,7 +439,7 @@ if __name__ == "__main__":
     plt.ylabel("Accuracy")
     plt.show()
 
-    print("Final accuracy over validation data\n-------------------------------")
+    print("Final accuracy over validation data\n-------------------------------") if not args.silent else None
     test(
         valid_dataloader,
         model,
