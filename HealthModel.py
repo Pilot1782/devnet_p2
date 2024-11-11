@@ -9,7 +9,7 @@ from torch import Tensor
 from torchvision.transforms import transforms
 
 from pretrain import preprocess_image, prepreprocess_image
-from train import HealthNetwork, classes
+from train import HealthNetwork
 
 
 class HealthModel:
@@ -24,8 +24,10 @@ class HealthModel:
             transforms.Resize((250, 250)),
             transforms.ToTensor()
         ])
-        self.__device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+        self.__device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        __checkpoint = torch.load(weights, weights_only=True)
+        self.__model.load_state_dict(__checkpoint)
         self.__model = self.__model.to(self.__device)
 
     def _image_loader(self, image: ndarray) -> Tensor:
@@ -48,11 +50,13 @@ class HealthModel:
             image.to(self.__device)
 
             output = self.__model(image)
+            probs = torch.nn.functional.softmax(output, dim=1)
 
-            index = output.data.cpu().numpy().argmax()
-            ps = output.data.cpu().numpy()
+            ps, index = torch.max(probs, 1)
+            ps = ps.item()
+            index = index.item()
 
-        return index, ps[0].max()
+        return float(index), float(ps)
 
     def predict(self, image: Union[str, ndarray], multi_leaf=True, __debug=False) -> tuple[str, float]:
         """
@@ -72,12 +76,12 @@ class HealthModel:
 
         images = [image]
         if multi_leaf:
-            images = prepreprocess_image(image)
+            images = prepreprocess_image(image, __debug=__debug)
 
         images = [self._image_loader(preprocess_image(image)) for image in images]
 
-        healths = np.float64(np.array(list(range(len(images)))))
-        confs = np.float64(np.array(list(range(len(images)))))
+        healths = np.arange(0, len(images))
+        confs = np.array(list(range(len(images))), dtype=np.float64)
 
         for i in range(len(images)):
             health, confidence = self._predict(images[i])
@@ -87,7 +91,7 @@ class HealthModel:
         avg_health = round(np.average(healths))
         avg_confidence = float(np.average(confs))
 
-        return classes[avg_health], avg_confidence
+        return ("healthy", "unhealthy")[avg_health], avg_confidence
 
 
 if __name__ == '__main__':

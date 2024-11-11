@@ -123,7 +123,7 @@ def white_balance(_img):
     return result
 
 
-def water_split(_image: np.ndarray) -> list[np.ndarray]:
+def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
     """
     Splits the contour into separate contours. By watershed splitting
     Args:
@@ -147,8 +147,9 @@ def water_split(_image: np.ndarray) -> list[np.ndarray]:
         eroded = cv2.erode(filled, k)
 
         if np.sum(eroded) == 0:
-            print("Erosion complete")
+            print("Erosion complete") if __debug else None
             break
+        print(f"E# {i}", end="\r")
 
         contours, _ = cv2.findContours(eroded, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -163,6 +164,10 @@ def water_split(_image: np.ndarray) -> list[np.ndarray]:
                 cv2.drawContours(full, [cnt], -1, 255, -1)
 
                 full = cv2.dilate(full, k)
+
+                # Use our dilated section as a mask of the original contour
+                full = cv2.bitwise_and(filled, filled, mask=full)
+
                 cnt, _ = cv2.findContours(full, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
                 cnt_area = cv2.contourArea(cnt[0])
@@ -202,7 +207,7 @@ def is_closed(contour):
     return cv2.contourArea(contour) > cv2.arcLength(contour, True)
 
 
-def prepreprocess_image(_image: np.ndarray, __debug=True) -> tuple[np.ndarray]:
+def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
     """
     Takes an overhead image of a plant box and crops to the leaves in the image
 
@@ -301,7 +306,7 @@ def prepreprocess_image(_image: np.ndarray, __debug=True) -> tuple[np.ndarray]:
                 tmp = np.zeros_like(green)
                 cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
                 tmp = np.average(tmp, 2)
-                split = water_split(tmp)
+                split = water_split(tmp, __debug=__debug)
                 for s in split:
                     tmp_contours += (s,)
             else:
