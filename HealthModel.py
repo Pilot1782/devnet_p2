@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Tuple
 
 import numpy as np
 import requests
@@ -60,7 +60,7 @@ class HealthModel:
 
         return float(index), float(ps)
 
-    def predict(self, image: Union[str, ndarray], multi_leaf=True, _debug=False) -> tuple[str, float]:
+    def predict(self, image: Union[str, ndarray], multi_leaf=True, _debug=False) -> tuple[int, float]:
         """
         Predicts the health of the plant
 
@@ -93,4 +93,4 @@ class HealthModel:
         avg_health = round(np.average(healths))
         avg_confidence = float(np.average(confs))
 
-        return ("healthy", "unhealthy")[avg_health], avg_confidence
+        return avg_health, avg_confidence
