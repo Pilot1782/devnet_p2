@@ -2,11 +2,16 @@ import json
 import os
 import flask
 import requests
+import io
 from datetime import datetime
+from PIL import Image
+
+from HealthModel import HealthModel
 
 import google_auth_oauthlib.flow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from googleapiclient.http import MediaIoBaseDownload
 
 # This variable specifies the name of a file that contains the OAuth 2.0
 # information for this application, including its client_id and client_secret.
@@ -14,7 +19,7 @@ CLIENT_SECRETS_FILE = "clientSecret.json"
 
 # This OAuth 2.0 access scope allows for full read/write access to the
 # authenticated user's account and requires requests to use an SSL connection.
-SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly']
+SCOPES = ['https://www.googleapis.com/auth/drive.metadata.readonly','https://www.googleapis.com/auth/drive.readonly']
 API_SERVICE_NAME = 'drive'
 API_VERSION = 'v2'
 
@@ -44,6 +49,44 @@ def loadData():
     newData = json.load(data)
     current_credentials = newData['creds']
     lastImageData = newData['imgData']
+
+def credentials_to_dict(credentials):
+  return {'token': credentials.token,
+          'refresh_token': credentials.refresh_token,
+          'token_uri': credentials.token_uri,
+          'client_id': credentials.client_id,
+          'client_secret': credentials.client_secret,
+          'scopes': credentials.scopes}
+
+def print_index_table():
+  return ('<table>' +
+          '<tr><td><a href="/test">Test an API request</a></td>' +
+          '<td>Submit an API request and see a formatted JSON response. ' +
+          '    Go through the authorization flow if there are no stored ' +
+          '    credentials for the user.</td></tr>' +
+          '<tr><td><a href="/authorize">Test the auth flow directly</a></td>' +
+          '<td>Go directly to the authorization flow. If there are stored ' +
+          '    credentials, you still might not be prompted to reauthorize ' +
+          '    the application.</td></tr>' +
+          '<tr><td><a href="/revoke">Revoke current credentials</a></td>' +
+          '<td>Revoke the access token associated with the current user ' +
+          '    session. After revoking credentials, if you go to the test ' +
+          '    page, you should see an <code>invalid_grant</code> error.' +
+          '</td></tr>')
+
+def downloadImg(file_id):
+  request = service.files().get_media(fileId=file_id)#, mimeType='image/jpg')
+
+  fh = io.BytesIO()
+  downloader = MediaIoBaseDownload(fh, request)
+  done = False
+  while done is False:
+    status, done = downloader.next_chunk()
+    print("Downloading " + file_id + " %d%%" % int(status.progress() * 100))
+
+  imageStream = Image.open(fh)
+  #imageStream.save("currentSavedImage.jpg")
+  return imageStream
 
 @app.route('/')
 def index():
@@ -105,7 +148,7 @@ def oauth2callback():
   global service
   service = build("drive", "v3", credentials=current_credentials)
 
-  return flask.redirect("/test")#flask.url_for('test_api_request'))
+  return flask.redirect("/runmodel")#flask.url_for('test_api_request'))
 
 
 @app.route('/revoke')
@@ -126,55 +169,30 @@ def revoke():
   else:
     return('An error occurred.' + print_index_table())
 
-
-@app.route('/clear')
-def clear_credentials():
-  if 'credentials' in flask.session:
-    del flask.session['credentials']
-  return ('Credentials have been cleared.<br><br>' +
-          print_index_table())
-
-
-def credentials_to_dict(credentials):
-  return {'token': credentials.token,
-          'refresh_token': credentials.refresh_token,
-          'token_uri': credentials.token_uri,
-          'client_id': credentials.client_id,
-          'client_secret': credentials.client_secret,
-          'scopes': credentials.scopes}
-
-def print_index_table():
-  return ('<table>' +
-          '<tr><td><a href="/test">Test an API request</a></td>' +
-          '<td>Submit an API request and see a formatted JSON response. ' +
-          '    Go through the authorization flow if there are no stored ' +
-          '    credentials for the user.</td></tr>' +
-          '<tr><td><a href="/authorize">Test the auth flow directly</a></td>' +
-          '<td>Go directly to the authorization flow. If there are stored ' +
-          '    credentials, you still might not be prompted to reauthorize ' +
-          '    the application.</td></tr>' +
-          '<tr><td><a href="/revoke">Revoke current credentials</a></td>' +
-          '<td>Revoke the access token associated with the current user ' +
-          '    session. After revoking credentials, if you go to the test ' +
-          '    page, you should see an <code>invalid_grant</code> error.' +
-          '</td></tr>' +
-          '<tr><td><a href="/clear">Clear Flask session credentials</a></td>' +
-          '<td>Clear the access token currently stored in the user session. ' +
-          '    After clearing the token, if you <a href="/test">test the ' +
-          '    API request</a> again, you should go back to the auth flow.' +
-          '</td></tr></table>')
-
-@app.route("/test")
+@app.route("/runmodel")
 def getNewImage():
   results = service.files().list(
       q="'1PNm562W_IqKJ8Zxl8bz03p_yiEZoh88W' in parents", spaces="drive", orderBy="name_natural desc", fields="nextPageToken, files(id, modifiedTime, name)"
     ).execute()
-# all files from specific folder name with link
+  
   items = results.get('files', [])
   newestImg = items[0]
 
   global lastImageData
   newestImg["prevRecieved"] = lastImageData["id"] == newestImg["id"]
+
+  if newestImg["prevRecieved"]:
+    return flask.redirect("/view")
+  
+  imageStream = downloadImg(newestImg["id"])
+  model = HealthModel(os.path.join(os.getcwd(),"model.pth"))
+
+  prediction = model.predict(imageStream)
+
+  newestImg["runTime"] = datetime.now().isoformat()
+  newestImg["healthy"] = bool(prediction[0])
+  newestImg["confidence"] = prediction[1]
+
   lastImageData = newestImg
   #saveData()
   #modifiedTime = datetime.strptime(items[0]["modifiedTime"][:-5], "%Y-%m-%dT%H:%M:%S")
@@ -188,11 +206,16 @@ def getNewImage():
 @app.route("/view")
 def viewCurrentData():
   #TODO: IsHealthy is a boolean indicating whether the plant is healthy or not healthy.
-  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=True)
+  return flask.render_template("view.html", fileid=lastImageData["id"], filename=lastImageData["name"], isHealthy=lastImageData["healthy"], confidence=lastImageData["confidence"], runTime=lastImageData["runTime"])
 
-@app.route("/trainModel")
+@app.route("/trainmodel")
 def trainModel():
-  pass
+  fileId = flask.request.args.get("FILEID")
+
+  if fileId is None:
+    return "", 400
+  
+  return "", 501
 
 
 
