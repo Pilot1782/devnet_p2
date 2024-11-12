@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Union, Tuple
 
 import numpy as np
 import requests
@@ -26,7 +26,7 @@ class HealthModel:
         ])
 
         self.__device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        __checkpoint = torch.load(weights, weights_only=True)
+        __checkpoint = torch.load(weights, weights_only=True, map_location=self.__device)
         self.__model.load_state_dict(__checkpoint)
         self.__model = self.__model.to(self.__device)
 
@@ -42,7 +42,9 @@ class HealthModel:
         image = Image.fromarray(image, mode="RGB")
         image = self.__loader(image).float()
         image = image.unsqueeze(0)
-        return image.cuda()
+        if self.__device == 'cuda':
+            return image.cuda()
+        return image.cpu()
 
     def _predict(self, image):
         self.__model.eval()
@@ -58,7 +60,7 @@ class HealthModel:
 
         return float(index), float(ps)
 
-    def predict(self, image: Union[str, ndarray], multi_leaf=True, _debug=False) -> tuple[str, float]:
+    def predict(self, image: Union[str, ndarray], multi_leaf=True, _debug=False) -> tuple[int, float]:
         """
         Predicts the health of the plant
 
@@ -91,9 +93,4 @@ class HealthModel:
         avg_health = round(np.average(healths))
         avg_confidence = float(np.average(confs))
 
-        return ("healthy", "unhealthy")[avg_health], avg_confidence
-
-
-if __name__ == '__main__':
-    model = HealthModel('weights.pth')
-    print(model.predict(r"C:\Users\carso\Downloads\devnet-sample-images\image_2024-10-06_12-30-03_orange_pepper.jpg"))
+        return avg_health, avg_confidence

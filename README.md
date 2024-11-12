@@ -4,7 +4,13 @@
 
 Installation is very simple, just install the needed dependencies.
 
+Use the following index-urls for the desired torch backend:
+- cpu: `https://download.pytorch.org/whl/cpu`
+- cuda: `https://download.pytorch.org/whl/cu124`
+- rocm: `https://download.pytorch.org/whl/rocm6.2`
+
 ```shell
+python3 -m pip install torch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 --index-url https://download.pytorch.org/whl/cpu
 python3 -m pip install -r requirements.txt
 ```
 
