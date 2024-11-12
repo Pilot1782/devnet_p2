@@ -5,6 +5,7 @@ import requests
 import io
 from datetime import datetime
 from PIL import Image
+import numpy as np
 
 from HealthModel import HealthModel
 
@@ -84,8 +85,9 @@ def downloadImg(file_id):
     status, done = downloader.next_chunk()
     print("Downloading " + file_id + " %d%%" % int(status.progress() * 100))
 
-  imageStream = Image.open(fh)
+  #imageStream = Image.open(fh)
   #imageStream.save("currentSavedImage.jpg")
+  imageStream = np.array(fh.getbuffer())
   return imageStream
 
 @app.route('/')
