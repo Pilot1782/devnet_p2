@@ -184,12 +184,12 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                 (x, y), (w, h), rot = cv2.minAreaRect(cnt)
                 asp = w / h
                 if abs(1 - asp) > .5:
-                    print(f"Splitting again: {asp}")
+                    print(f"Splitting again: {asp}") if __debug else None
 
                     hull = cv2.convexHull(cnt, returnPoints=False)
                     defects = cv2.convexityDefects(cnt, hull)
                     if defects is None:
-                        print("Halting splitting")
+                        print("Halting splitting") if __debug else None
                         continue
 
                     # get the defect closest to the center of mass
@@ -357,12 +357,10 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
         tmp_contours = ()
         for contour in fixed_cnts:
             if not is_closed(contour):
-                print("Unclosed contour")
                 continue
 
             area = cv2.contourArea(contour)
             if area < 1000:  # Filter out small contours
-                print("Contour area is too small")
                 continue
 
             thresh = 0.6
@@ -401,10 +399,10 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
 
         # noise removal
         kernel = np.ones((3, 3), np.uint8)
-        opening = cv2.morphologyEx(full, cv2.MORPH_OPEN, kernel, iterations=2)
+        opening = cv2.morphologyEx(full, cv2.MORPH_OPEN, kernel, iterations=3)
 
         # sure background area
-        sure_bg = cv2.dilate(opening, kernel, iterations=3)
+        sure_bg = cv2.dilate(opening, kernel, iterations=4)
 
         # Finding sure foreground area
         dist_transform = cv2.distanceTransform(np.uint8(opening), cv2.DIST_L2, 5)
@@ -414,9 +412,43 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
         sure_fg = np.uint8(sure_fg)
         unknown = cv2.subtract(np.uint8(sure_bg), sure_fg)
 
-        # cv2.imshow("Unknown", np.uint8(unknown))
-        # cv2.imshow("Sure BG", np.uint8(sure_bg))
-        # cv2.imshow("Sure FG", np.uint8(sure_fg))
+        # Marker labelling
+        ret, markers = cv2.connectedComponents(sure_fg)
+
+        # Add one to all labels so that sure background is not 0, but 1
+        markers = markers + 1
+
+        # Now, mark the region of unknown with zero
+        markers[unknown == 255] = 0
+
+        img2 = np.copy(green)
+        img2 = cv2.bitwise_and(img2, img2, mask=np.uint8(full / 255))
+        markers = cv2.watershed(img2, markers)
+        img2[markers == -1] = [0, 0, 255]
+
+        edges = np.zeros_like(img2)
+        edges[markers == -1] = [255, 255, 255]
+        edges = np.average(edges, 2)
+        edges = np.uint8(edges)
+
+        # set the borders to black
+        w, h = edges.shape
+        edges[0, :] = 0
+        edges[w-1, :] = 0
+        edges[:, 0] = 0
+        edges[:, h-1] = 0
+
+        edges = cv2.Canny(edges, 100, 200)
+        edges = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
+
+        contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+        tmp = np.zeros_like(green)
+        for cnt in contours:
+            color = (np.random.randint(0, 255), np.random.randint(0, 255), np.random.randint(0, 255))
+            cv2.drawContours(tmp, [cnt], -1, color, -1)
+
+        # cv2.imshow("Leaves", np.uint8(edges))
         # cv2.waitKey(0)
         # cv2.destroyAllWindows()
 
