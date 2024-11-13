@@ -44,4 +44,4 @@ if __name__ == "__main__":
         image = cv2.imread(os.path.join(args.path, img))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         pred = model.predict(image, multi_leaf=not img[0].isdigit(), _debug=args.debug)
-        print(f"{img}: {pred[0]} ({pred[1] * 100:.2f}%)")
+        print(f"{img}: {'Unhealthy' if int(pred[0]) else 'Healthy'} ({pred[1] * 100:.5f}%)")
