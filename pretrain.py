@@ -1,11 +1,14 @@
 # Download latest version
 import os
 import shutil
+from typing import Any
 
 import cv2
 import kagglehub
 import numpy as np
+from cv2 import Mat
 from matplotlib import pyplot as plt
+from numpy import ndarray, dtype
 
 if __name__ == "__main__":
     path = kagglehub.dataset_download("csafrit2/plant-leaves-for-image-classification")
@@ -142,9 +145,10 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
 
     section_area = cv2.contourArea(contour)
 
-    for i in range(1000):
-        k = np.ones((i, i), np.uint8)
-        eroded = cv2.erode(filled, k)
+    eroded = np.zeros_like(filled)
+    for i in range(500):
+        k = np.ones((5, 5), np.uint8)
+        eroded = cv2.erode(filled, k, iterations=i)
 
         if np.sum(eroded) == 0:
             print("Erosion complete") if __debug else None
@@ -163,7 +167,7 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                 full = np.zeros_like(filled)
                 cv2.drawContours(full, [cnt], -1, (255,), -1)
 
-                full = cv2.dilate(full, k)
+                full = cv2.dilate(full, k, iterations=i)
 
                 # Use our dilated section as a mask of the original contour
                 full = cv2.bitwise_and(filled, filled, mask=full)
@@ -191,8 +195,15 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                     # get the defect closest to the center of mass
                     m = cv2.moments(cnt)
                     CoM = (m["m10"] // m["m00"], m["m01"] // m["m00"])
+
+                    corners = cv2.goodFeaturesToTrack(
+                        filled,
+                        30,
+                        0.01,
+                        2)
                     dist = []
                     points = []
+
                     for j in range(defects.shape[0]):
                         s, e, f, d = defects[j, 0]
                         start = tuple(cnt[s][0])
@@ -210,22 +221,23 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                     minDist = dist.index(min(dist))
                     pnt = points[minDist][0]
                     dist = []
-                    for j in points:
-                        far = j[0]
+                    for j in corners:
+                        far = j.ravel()
                         distance = np.sqrt(
                             (pnt[0] - far[0]) ** 2 +
                             (pnt[1] - far[1]) ** 2
                         )
+                        if distance <= 2:
+                            continue
+
                         dist.append(distance)
 
                     minDist2 = dist.index(min(dist))
-                    pnt2 = points[minDist2][0]
+                    pnt2 = corners[minDist2][0]
 
                     _start = (int(pnt[0]), int(pnt[1]))
                     _end = (int(pnt2[0]), int(pnt2[1]))
                     cv2.line(filled, _start, _end, (0,), 2)
-                    cv2.imshow("Contours", filled)
-                    cv2.waitKey(0)
 
                     cnt, _ = cv2.findContours(filled, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
                     out.extend(cnt)
@@ -236,6 +248,9 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
             if len(out) > 1:
                 break
             out = []
+
+    if np.sum(eroded) == 0:
+        out = [contour]
 
     return out
 
@@ -342,13 +357,15 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
         tmp_contours = ()
         for contour in fixed_cnts:
             if not is_closed(contour):
+                print("Unclosed contour")
                 continue
 
             area = cv2.contourArea(contour)
             if area < 1000:  # Filter out small contours
+                print("Contour area is too small")
                 continue
 
-            thresh = 0.5
+            thresh = 0.6
 
             hull = cv2.convexHull(contour)
             pdiff = (cv2.contourArea(hull) - area) / area
@@ -362,12 +379,46 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
                 cv2.drawContours(tmp, [contour], -1, (255, 255, 255), -1)
                 tmp = np.average(tmp, 2)
                 split = water_split(tmp, __debug=__debug)
+
                 for s in split:
                     tmp_contours += (s,)
             else:
                 tmp_contours += (contour,)
 
         fixed_cnts = tmp_contours
+
+    areas = [(cv2.contourArea(contour), contour) for contour in fixed_cnts]
+    areas = sorted(areas, key=lambda x: x[0], reverse=True)
+    pots = [
+        areas[0][1],
+        areas[1][1],
+        areas[2][1],
+    ]
+    for pot in pots:
+        full = np.zeros_like(_image)
+        full = np.average(full, 2)
+        cv2.drawContours(full, [pot], -1, (255,), -1)
+
+        # noise removal
+        kernel = np.ones((3, 3), np.uint8)
+        opening = cv2.morphologyEx(full, cv2.MORPH_OPEN, kernel, iterations=2)
+
+        # sure background area
+        sure_bg = cv2.dilate(opening, kernel, iterations=3)
+
+        # Finding sure foreground area
+        dist_transform = cv2.distanceTransform(np.uint8(opening), cv2.DIST_L2, 5)
+        ret, sure_fg = cv2.threshold(dist_transform, 0.7 * dist_transform.max(), 255, 0)
+
+        # Finding unknown region
+        sure_fg = np.uint8(sure_fg)
+        unknown = cv2.subtract(np.uint8(sure_bg), sure_fg)
+
+        # cv2.imshow("Unknown", np.uint8(unknown))
+        # cv2.imshow("Sure BG", np.uint8(sure_bg))
+        # cv2.imshow("Sure FG", np.uint8(sure_fg))
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
     out = []
     tmp = np.zeros_like(_image)
