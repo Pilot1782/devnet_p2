@@ -36,21 +36,21 @@ selectedImageData = None
 imageDataHistory = []
 
 def credentials_to_dict(credentials):
-  return {'token': credentials.token,
-          'refresh_token': credentials.refresh_token,
+  return {'refresh_token': credentials.refresh_token,
           'token_uri': credentials.token_uri,
           'client_id': credentials.client_id,
-          'client_secret': credentials.client_secret,
-          'scopes': credentials.scopes}
+          'client_secret': credentials.client_secret}
 
-def saveData():
+def saveUserData():
   creds = credentials_to_dict(current_credentials)
+  if creds["refresh_token"] is None:
+    return
   with open('userdata.json', 'w') as data:
     data.seek(0)
     json.dump(creds, data)
     data.truncate()
 
-def saveUserData():
+def saveData():
   with open('data.json', 'w') as data:
     data.seek(0)
     json.dump(imageDataHistory, data)
@@ -90,7 +90,6 @@ def downloadImg(file_id):
 
   imageStream = Image.open(fh)
   imageStream = np.array(imageStream, dtype=np.uint8)
-  print(imageStream.shape)
   return imageStream
 
 @app.route('/')
@@ -133,6 +132,9 @@ def authorize():
 
 @app.route('/oauth2callback')
 def oauth2callback():
+  global current_credentials
+  if current_credentials is not None:
+    return flask.status(423)
   # Specify the state when creating the flow in the callback so that it can
   # verified in the authorization server response.
   state = flask.session['state']
@@ -148,7 +150,6 @@ def oauth2callback():
   # Store credentials in the session.
   # ACTION ITEM: In a production app, you likely want to save these
   #              credentials in a persistent database instead.
-  global current_credentials
   current_credentials = flow.credentials
   saveUserData()
 
@@ -183,9 +184,10 @@ def runNewImage():
 
   newestImg["runTime"] = datetime.now().isoformat()
   newestImg["healthy"] = bool(prediction[0])
-  newestImg["confidence"] = prediction[1]
+  print(prediction[1])
+  newestImg["confidence"] = float(int(prediction[1] * 100000) / 100000.0) * 100
 
-  imageDataHistory.push(newestImg)
+  imageDataHistory.append(newestImg)
   selectedImageData = newestImg
   saveData()
 
@@ -195,6 +197,8 @@ def runNewImage():
 def viewCurrentData():
   if current_credentials is None:
     return flask.redirect("/authorize")
+  if selectedImageData is None:
+    return flask.redirect("/runmodel")
   
   return flask.render_template("view.html", fileid=selectedImageData["id"], filename=selectedImageData["name"], isHealthy=selectedImageData["healthy"], confidence=selectedImageData["confidence"], runTime=selectedImageData["runTime"])
 
