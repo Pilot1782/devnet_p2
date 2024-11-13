@@ -13,8 +13,8 @@
             <span class="false">not healthy. &#128542</span>
         {% endif %}
         </h4>
-        <h4>Model confidence rating: 100% <!--Insert var for confidence rating here--></h4>
-        <h4>Model ran at: 11/3/2024, 8:00 PM</h4> <!-- Insert var for model timestamp here-->
+        <h4>Model confidence rating: {% confidence %}%</h4>
+        <h4>Model ran at: {% runTime %}</h4> <!-- Insert var for model timestamp here-->
         <h4>Do you agree with the model's prediction?</h4>
         <button type="button">Yes</button> <span><button type="button">No</button></span>
 

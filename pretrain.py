@@ -138,7 +138,7 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
     filled = np.zeros_like(_image)
     contour, _ = cv2.findContours(_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contour = contour[0]
-    cv2.drawContours(filled, [contour], -1, 255, -1)
+    cv2.drawContours(filled, [contour], -1, (255,), -1)
 
     section_area = cv2.contourArea(contour)
 
@@ -161,7 +161,7 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                 before_area += cv2.contourArea(cnt)
 
                 full = np.zeros_like(filled)
-                cv2.drawContours(full, [cnt], -1, 255, -1)
+                cv2.drawContours(full, [cnt], -1, (255,), -1)
 
                 full = cv2.dilate(full, k)
 
@@ -169,14 +169,63 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                 full = cv2.bitwise_and(filled, filled, mask=full)
 
                 cnt, _ = cv2.findContours(full, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                cnt = cnt[0]
 
-                cnt_area = cv2.contourArea(cnt[0])
+                cnt_area = cv2.contourArea(cnt)
                 total_area += cnt_area
 
                 if cnt_area * 1.25 < section_area / len(contours):
                     continue
 
-                out.append(cnt[0])
+                (x, y), (w, h), rot = cv2.minAreaRect(cnt)
+                asp = w / h
+                if abs(1 - asp) > .5:
+                    print(f"Splitting again: {asp}")
+
+                    hull = cv2.convexHull(cnt, returnPoints=False)
+                    defects = cv2.convexityDefects(cnt, hull)
+                    if defects is None:
+                        print("Halting splitting")
+                        continue
+
+                    # get the defect closest to the center of mass
+                    m = cv2.moments(cnt)
+                    CoM = (m["m10"] // m["m00"], m["m01"] // m["m00"])
+                    dist = []
+                    points = []
+                    for j in range(defects.shape[0]):
+                        s, e, f, d = defects[j, 0]
+                        start = tuple(cnt[s][0])
+                        end = tuple(cnt[e][0])
+                        mid = (start[0] / 2 + end[0]/2, start[1] / 2 + end[1]/2)
+                        far = tuple(cnt[f][0])
+
+                        distance = np.sqrt(
+                            (CoM[0] - far[0]) ** 2 +
+                            (CoM[1] - far[1]) ** 2
+                        )
+                        dist.append(distance)
+                        points.append((far, mid))
+
+                    minDist = dist.index(min(dist))
+
+                    def __f(_x):
+                        pnt = points[minDist]
+                        _m = ((pnt[0][1] - pnt[1][1]) /
+                              (pnt[0][0] - pnt[1][0]))
+                        return _m * (x - pnt[0][0]) + pnt[0][1]
+
+                    _start = (int(x - w), int(__f(x - w)))
+                    _end = (int(x + w), int(__f(x + w)))
+                    cv2.line(filled, _start, _end, (0,), 2)
+                    cv2.imshow("Contours", filled)
+                    cv2.waitKey(0)
+
+                    cnt, _ = cv2.findContours(filled, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    out.extend(cnt)
+                    continue
+
+                out.append(cnt)
 
             if len(out) > 1:
                 break
@@ -230,7 +279,7 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
     r = np.pad(_image[:, :, 0], 5, mode='constant', constant_values=0)
     g = np.pad(_image[:, :, 1], 5, mode='constant', constant_values=0)
     b = np.pad(_image[:, :, 2], 5, mode='constant', constant_values=0)
-    _image.resize((r.shape[0], r.shape[1], 3))
+    _image.resize((r.shape[0], r.shape[1], 3), refcheck=False)
     _image[:, :, 0] = r
     _image[:, :, 1] = g
     _image[:, :, 2] = b
