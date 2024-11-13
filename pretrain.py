@@ -197,7 +197,7 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                         s, e, f, d = defects[j, 0]
                         start = tuple(cnt[s][0])
                         end = tuple(cnt[e][0])
-                        mid = (start[0] / 2 + end[0]/2, start[1] / 2 + end[1]/2)
+                        mid = (start[0] / 2 + end[0] / 2, start[1] / 2 + end[1] / 2)
                         far = tuple(cnt[f][0])
 
                         distance = np.sqrt(
@@ -208,15 +208,21 @@ def water_split(_image: np.ndarray, __debug=False) -> list[np.ndarray]:
                         points.append((far, mid))
 
                     minDist = dist.index(min(dist))
+                    pnt = points[minDist][0]
+                    dist = []
+                    for j in points:
+                        far = j[0]
+                        distance = np.sqrt(
+                            (pnt[0] - far[0]) ** 2 +
+                            (pnt[1] - far[1]) ** 2
+                        )
+                        dist.append(distance)
 
-                    def __f(_x):
-                        pnt = points[minDist]
-                        _m = ((pnt[0][1] - pnt[1][1]) /
-                              (pnt[0][0] - pnt[1][0]))
-                        return _m * (x - pnt[0][0]) + pnt[0][1]
+                    minDist2 = dist.index(min(dist))
+                    pnt2 = points[minDist2][0]
 
-                    _start = (int(x - w), int(__f(x - w)))
-                    _end = (int(x + w), int(__f(x + w)))
+                    _start = (int(pnt[0]), int(pnt[1]))
+                    _end = (int(pnt2[0]), int(pnt2[1]))
                     cv2.line(filled, _start, _end, (0,), 2)
                     cv2.imshow("Contours", filled)
                     cv2.waitKey(0)
