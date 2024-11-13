@@ -414,11 +414,11 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
         sure_fg = np.uint8(sure_fg)
         unknown = cv2.subtract(np.uint8(sure_bg), sure_fg)
 
-        cv2.imshow("Unknown", np.uint8(unknown))
-        cv2.imshow("Sure BG", np.uint8(sure_bg))
-        cv2.imshow("Sure FG", np.uint8(sure_fg))
-        cv2.waitKey(0)
-        cv2.destroyAllWindows()
+        # cv2.imshow("Unknown", np.uint8(unknown))
+        # cv2.imshow("Sure BG", np.uint8(sure_bg))
+        # cv2.imshow("Sure FG", np.uint8(sure_fg))
+        # cv2.waitKey(0)
+        # cv2.destroyAllWindows()
 
     out = []
     tmp = np.zeros_like(_image)
