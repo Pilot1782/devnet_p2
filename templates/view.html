@@ -4,6 +4,7 @@
         <link rel="stylesheet" href="static/style.css">
     </head>
     <body>
+        <div id="imageList" class="imageList"></div>
         <h3>{{ filename }}</h3>
         <iframe src="https://drive.google.com/file/d/{{ fileid }}/preview" width="640" height="480" allow="autoplay"></iframe>
         <h4>This plant is<!--TODO: check for boolean and state healthy or unhealthy-->
@@ -15,8 +16,34 @@
         </h4>
         <h4>Model confidence rating: {{ confidence }}%</h4>
         <h4>Model ran at: {{ runTime }}</h4> <!-- Insert var for model timestamp here-->
-        <h4>Do you agree with the model's prediction?</h4>
-        <button type="button">Yes</button> <span><button type="button">No</button></span>
+        <script>
+            function decodeHtml(html) {
+                var txt = document.createElement("textarea");
+                txt.innerHTML = html;
+                return txt.value;
+            }
+            var imageList = document.getElementById("imageList");
+
+            var allimages = decodeHtml("{{ allfiles }}");
+            allimages = JSON.parse(allimages);
+            var selectedFileId = "{{ fileid }}";
+
+            allimages.forEach(image => {
+                var button = document.createElement("button");
+                button.innerHTML = '<p>' + image.name + '</p><img src="https://lh3.googleusercontent.com/d/' + image.id + '">'
+                imageList.appendChild(button);
+
+                button.onclick = function() {
+                    window.location.href = "/runmodel?FILEID=" + image.id;
+                }
+
+                if (image.id == selectedFileId) {
+                    button.style.backgroundColor = "lightblue";
+                }
+            });
+        </script>
+        <!--<h4>Do you agree with the model's prediction?</h4>
+        <button type="button">Yes</button> <span><button type="button">No</button></span>-->
 
     </body>
 </html>

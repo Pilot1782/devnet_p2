@@ -163,12 +163,23 @@ def runNewImage():
   if current_credentials is None:
     return flask.redirect("/authorize")
   
+  fileId = flask.request.args.get("FILEID")
+  
   results = service.files().list(
       q="'1PNm562W_IqKJ8Zxl8bz03p_yiEZoh88W' in parents", spaces="drive", orderBy="name_natural desc", fields="nextPageToken, files(id, modifiedTime, name)"
     ).execute()
   
   items = results.get('files', [])
-  newestImg = items[0]
+
+  if fileId is None:
+    newestImg = items[0]
+  else:
+    for img in items:
+      if img["id"] == fileId:
+        newestImg = img
+        break
+    else:
+      newestImg = items[0]
 
   global imageDataHistory, selectedImageData
 
@@ -200,7 +211,13 @@ def viewCurrentData():
   if selectedImageData is None:
     return flask.redirect("/runmodel")
   
-  return flask.render_template("view.html", fileid=selectedImageData["id"], filename=selectedImageData["name"], isHealthy=selectedImageData["healthy"], confidence=selectedImageData["confidence"], runTime=selectedImageData["runTime"])
+  results = service.files().list(
+      q="'1PNm562W_IqKJ8Zxl8bz03p_yiEZoh88W' in parents", spaces="drive", orderBy="name_natural desc", fields="nextPageToken, files(id, modifiedTime, name)"
+    ).execute()
+  
+  items = json.dumps(results.get('files', []))
+  
+  return flask.render_template("view.html", allfiles=items, fileid=selectedImageData["id"], filename=selectedImageData["name"], isHealthy=selectedImageData["healthy"], confidence=selectedImageData["confidence"], runTime=selectedImageData["runTime"])
 
 @app.route("/trainmodel")
 def trainModel():

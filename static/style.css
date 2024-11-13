@@ -6,6 +6,26 @@
     color:red
 }
 
+.imageList {
+    float: left;
+    width: 25.5vw;
+    margin-right: -24vw;
+    font-size: small;
+    overflow-y:auto;
+    height: 99vh;
+}
+
+.imageList button {
+    width: 50%;
+    float: left;
+}
+
+.imageList img {
+    width: 100%;
+    height: 10%;
+    object-fit: cover;
+}
+
 button {
     cursor: pointer;
     font-size: larger;
