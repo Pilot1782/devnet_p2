@@ -4,6 +4,7 @@ import numpy as np
 import requests
 import torch
 from PIL import Image
+from matplotlib import pyplot as plt
 from numpy import ndarray
 from torch import Tensor
 from torchvision.transforms import transforms
@@ -80,7 +81,16 @@ class HealthModel:
         if multi_leaf:
             images = prepreprocess_image(image, __debug=_debug)
 
-        images = [self._image_loader(preprocess_image(image)) for image in images]
+        images = [preprocess_image(image) for image in images]
+
+        if _debug:
+            sq = int(np.ceil(np.sqrt(len(images))))
+            for i in range(len(images)):
+                plt.subplot(sq, sq, i + 1)
+                plt.imshow(images[i])
+            plt.show()
+
+        images = [self._image_loader(img) for img in images]
 
         healths = np.arange(0, len(images))
         confs = np.array(list(range(len(images))), dtype=np.float64)

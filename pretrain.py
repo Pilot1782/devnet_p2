@@ -309,6 +309,9 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
 
     # Step Two: Find Green Areas
     green = cv2.inRange(_image, np.array([35, 50, 40]), np.array([75, 255, 255]))
+    kernel = np.ones((3, 3), dtype=np.uint8)
+    green = cv2.erode(green, kernel, iterations=3)
+    # green = cv2.dilate(green, kernel, iterations=3)
     green = cv2.bitwise_and(_image, _image, mask=green)
     green = cv2.cvtColor(green, cv2.COLOR_HSV2RGB)
 
