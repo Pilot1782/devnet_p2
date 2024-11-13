@@ -29,16 +29,19 @@ if __name__ == "__main__":
     if os.path.isdir(args.path):
         imgs = os.listdir(args.path)
     else:
-        imgs = [args.path]
+        path = args.path.split(os.sep)
+        args.path = os.sep.join(path[:-1])
+        imgs = [path[-1]]
 
     random.shuffle(imgs)
+    print(imgs)
     for img in imgs:
-        if img.split(".")[-1] not in ("bmp dib jpeg jpg jpe jp2 png webp "
+        if img.split(".")[-1].lower() not in ("bmp dib jpeg jpg jpe jp2 png webp "
                                       "avif pbm pgm ppm pxm pnm pfm sr "
                                       "ras tiff tif exr hdr pic").split(" "):
             continue
 
-        image = cv2.imread(img)
+        image = cv2.imread(os.path.join(args.path, img))
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         pred = model.predict(image, multi_leaf=not img[0].isdigit(), _debug=args.debug)
         print(f"{img}: {pred[0]} ({pred[1] * 100:.2f}%)")

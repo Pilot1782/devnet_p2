@@ -1,9 +1,11 @@
 from typing import Union, Tuple
 
+import cv2
 import numpy as np
 import requests
 import torch
 from PIL import Image
+from matplotlib import pyplot as plt
 from numpy import ndarray
 from torch import Tensor
 from torchvision.transforms import transforms
@@ -60,6 +62,18 @@ class HealthModel:
 
         return float(index), float(ps)
 
+    def _predict_alg(self, image):
+        g, y, b = cv2.split(image)
+
+        _C = 10
+        _K = 10
+
+        g = np.sum(g)
+        y = np.sum(y) * _C
+        b = np.sum(b) * _K
+
+        return g > y + b
+
     def predict(self, image: Union[str, ndarray], multi_leaf=True, _debug=False) -> tuple[int, float]:
         """
         Predicts the health of the plant
@@ -80,13 +94,28 @@ class HealthModel:
         if multi_leaf:
             images = prepreprocess_image(image, __debug=_debug)
 
-        images = [self._image_loader(preprocess_image(image)) for image in images]
+        images = [preprocess_image(image) for image in images]
+        alg_preds = [self._predict_alg(image) for image in images]
+
+        if _debug:
+            sq = int(np.ceil(np.sqrt(len(images))))
+            for i in range(len(images)):
+                plt.subplot(sq, sq, i + 1)
+                plt.imshow(images[i])
+            plt.show()
+
+            cv2.imwrite("currentSavedImage.jpg", images[-1])
+
+        images = [self._image_loader(img) for img in images]
 
         healths = np.arange(0, len(images))
         confs = np.array(list(range(len(images))), dtype=np.float64)
 
         for i in range(len(images)):
             health, confidence = self._predict(images[i])
+            if alg_preds[i]:
+                health = 0
+
             healths[i] = health
             confs[i] = confidence
 
