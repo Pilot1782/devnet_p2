@@ -87,12 +87,16 @@ image = cv2.imread("PATH TO IMAGE FILE")
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 pred = model.predict(image, multi_leaf=..., _debug=...)
 
-print(f"The image is {pred[0].upper()} ({pred[1] * 100:.2f}%)")
+print(f"The image is {'Unhealthy' if pred[0] else 'Healthy'} ({pred[1] * 100:.2f}%)")
 ```
 
-The `.predict()` method will return the health of the plant as a string (`"healthy"` or `"unhealthy"`)
+The `.predict()` method will return the health of the plant as an int (0 or 1 (0 is healthy))
 and a confidence value (percent from `0.0` to `1.0`).
 
 ## Web UI
 
-...
+```shell
+python3 webserver.py
+```
+
+Then open [localhost](http://localhost:8080)
