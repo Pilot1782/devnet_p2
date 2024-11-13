@@ -354,7 +354,9 @@ def prepreprocess_image(_image: np.ndarray, __debug=False) -> tuple[np.ndarray]:
 
     has_multi_leaf = True
     fixed_cnts = contours
-    while has_multi_leaf:
+    tries = 500
+    while has_multi_leaf and tries >= 0:
+        tries -= 1
         has_multi_leaf = False
 
         tmp_contours = ()
