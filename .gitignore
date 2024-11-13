@@ -3,4 +3,5 @@
 /.vscode/
 clientsecret.json
 userdata.json
+data.json
 /__pycache__/
