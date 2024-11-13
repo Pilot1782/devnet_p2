@@ -5,17 +5,17 @@
     </head>
     <body>
         <div id="imageList" class="imageList"></div>
-        <h3>{{ filename }}</h3>
-        <iframe src="https://drive.google.com/file/d/{{ fileid }}/preview" width="640" height="480" allow="autoplay"></iframe>
-        <h4>This plant is<!--TODO: check for boolean and state healthy or unhealthy-->
+        <h3 id="titleh">{{ filename }}</h3>
+        <iframe id="theframe" src="https://drive.google.com/file/d/{{ fileid }}/preview" width="640" height="480" allow="autoplay"></iframe>
+        <h4 id="h41">This plant is<!--TODO: check for boolean and state healthy or unhealthy-->
         {% if isHealthy %}
             <span class="true">healthy. &#128513</span>
             {% else %}
             <span class="false">not healthy. &#128542</span>
         {% endif %}
         </h4>
-        <h4>Model confidence rating: {{ confidence }}%</h4>
-        <h4>Model ran at: {{ runTime }}</h4> <!-- Insert var for model timestamp here-->
+        <h4 id="h42">Model confidence rating: {{ confidence }}%</h4>
+        <h4 id="h43">Model ran at: {{ runTime }}</h4> <!-- Insert var for model timestamp here-->
         <script>
             function decodeHtml(html) {
                 var txt = document.createElement("textarea");
@@ -23,6 +23,11 @@
                 return txt.value;
             }
             var imageList = document.getElementById("imageList");
+            var theframe = document.getElementById("theframe");
+            var h41 = document.getElementById("h41");
+            var h42 = document.getElementById("h42");
+            var h43 = document.getElementById("h43");
+            var titleh = document.getElementById("titleh");
 
             var allimages = decodeHtml("{{ allfiles }}");
             allimages = JSON.parse(allimages);
@@ -35,6 +40,11 @@
 
                 button.onclick = function() {
                     window.location.href = "/runmodel?FILEID=" + image.id;
+                    theframe.src = "https://drive.google.com/file/d/" + image.id + "/preview";
+                    h41.innerHTML = "Processing new image...";
+                    h42.innerHTML = "";
+                    h43.innerHTML = "";
+                    titleh.innerHTML = image.name;
                 }
 
                 if (image.id == selectedFileId) {

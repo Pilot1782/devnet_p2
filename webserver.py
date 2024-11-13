@@ -194,7 +194,7 @@ def runNewImage():
   prediction = model.predict(imageStream)
 
   newestImg["runTime"] = datetime.now().isoformat()
-  newestImg["healthy"] = bool(prediction[0])
+  newestImg["healthy"] = not bool(prediction[0])
   print(prediction[1])
   newestImg["confidence"] = float(int(prediction[1] * 100000) / 100000.0) * 100
 
